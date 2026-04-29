@@ -64,7 +64,57 @@ ORIGIN_SHARED_SECRET=                                  # optional, request-level
 | `LOOKI_PORT` | no | HTTP port for the server (default: `3456`) |
 | `LOOKI_MCP_BASE_URL` | no | Public URL of this server, used for icon display in MCP clients |
 | `LOOKI_USER_TIMEZONE` | no | IANA timezone name (e.g. `America/New_York`) for "today"/"recent" date calculations. Defaults to UTC when unset. See [Timezone Handling](#timezone-handling) below. |
+| `LOOKI_TLS_CERT_PATH` | no | Path to TLS certificate file (PEM). When set together with `LOOKI_TLS_KEY_PATH`, the server serves HTTPS directly. See [TLS / HTTPS](#tls--https) below. |
+| `LOOKI_TLS_KEY_PATH` | no | Path to TLS private key file (PEM). Must be set together with `LOOKI_TLS_CERT_PATH`. |
 | `ORIGIN_SHARED_SECRET` | no | Shared secret required in the `x-origin-secret` header (TODO: not yet enforced) |
+
+### TLS / HTTPS
+
+MCP clients like claude.ai require the server URL to be HTTPS for any public deployment.
+You have two ways to satisfy that:
+
+#### Option 1 — Reverse proxy in front (recommended for most users)
+
+Run the server as plain HTTP on a private network or localhost, and put a TLS-terminating
+reverse proxy in front. The server doesn't need to know about TLS.
+
+Common choices:
+- **Cloudflare Tunnel** — zero-config public HTTPS, free tier covers personal use
+- **Tailscale Funnel** — public HTTPS over Tailscale, no port forwarding needed
+- **Caddy** — `caddy reverse-proxy --to localhost:3456 --from looki-mcp.example.com`
+- **nginx** — standard `proxy_pass` config
+
+Leave `LOOKI_TLS_CERT_PATH` and `LOOKI_TLS_KEY_PATH` unset for this mode.
+
+#### Option 2 — Direct HTTPS (server binds TLS itself)
+
+Set both env vars to PEM-format files:
+
+```
+LOOKI_TLS_CERT_PATH=/etc/letsencrypt/live/looki-mcp.example.com/fullchain.pem
+LOOKI_TLS_KEY_PATH=/etc/letsencrypt/live/looki-mcp.example.com/privkey.pem
+```
+
+The server validates both files exist on startup; it exits with an error if either
+is missing or only one of the pair is set. The startup banner reports `https://`
+when TLS is active.
+
+For a Let's Encrypt cert via certbot:
+
+```bash
+sudo certbot certonly --standalone -d looki-mcp.example.com
+# Then point the env vars at /etc/letsencrypt/live/looki-mcp.example.com/{fullchain.pem,privkey.pem}
+# Make sure the user running looki-mcp can read those paths.
+```
+
+For testing locally with a self-signed cert:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 \
+    -nodes -subj "/CN=localhost"
+LOOKI_TLS_CERT_PATH=$(pwd)/cert.pem LOOKI_TLS_KEY_PATH=$(pwd)/key.pem python main.py
+# MCP clients won't accept self-signed certs by default — this is for verification only.
+```
 
 ### Timezone Handling
 

@@ -30,6 +30,16 @@ class Config:
     public_url: str | None
     origin_shared_secret: str | None
     user_timezone: str | None
+    tls_cert_path: str | None
+    tls_key_path: str | None
+
+    @property
+    def tls_enabled(self) -> bool:
+        return self.tls_cert_path is not None and self.tls_key_path is not None
+
+    @property
+    def scheme(self) -> str:
+        return "https" if self.tls_enabled else "http"
 
 
 _config: Config | None = None
@@ -48,6 +58,8 @@ async def load_and_validate_config() -> Config:
     public_url = os.getenv("LOOKI_MCP_BASE_URL", "").strip() or None
     origin_shared_secret = os.getenv("ORIGIN_SHARED_SECRET", "").strip() or None
     user_timezone = os.getenv("LOOKI_USER_TIMEZONE", "").strip() or None
+    tls_cert_path = os.getenv("LOOKI_TLS_CERT_PATH", "").strip() or None
+    tls_key_path = os.getenv("LOOKI_TLS_KEY_PATH", "").strip() or None
 
     missing: list[str] = []
     if not base_url:
@@ -95,6 +107,23 @@ async def load_and_validate_config() -> Config:
             )
             sys.exit(1)
 
+    # TLS: both cert and key must be set together, and both files must exist
+    if (tls_cert_path is None) != (tls_key_path is None):
+        which_set = "LOOKI_TLS_CERT_PATH" if tls_cert_path else "LOOKI_TLS_KEY_PATH"
+        which_missing = "LOOKI_TLS_KEY_PATH" if tls_cert_path else "LOOKI_TLS_CERT_PATH"
+        print(
+            f"looki-mcp: {which_set} is set but {which_missing} is not.",
+            file=sys.stderr,
+        )
+        print("  TLS requires both a certificate AND a private key. Set both, or unset both.", file=sys.stderr)
+        sys.exit(1)
+    if tls_cert_path and not Path(tls_cert_path).is_file():
+        print(f"looki-mcp: LOOKI_TLS_CERT_PATH '{tls_cert_path}' does not exist or is not a file.", file=sys.stderr)
+        sys.exit(1)
+    if tls_key_path and not Path(tls_key_path).is_file():
+        print(f"looki-mcp: LOOKI_TLS_KEY_PATH '{tls_key_path}' does not exist or is not a file.", file=sys.stderr)
+        sys.exit(1)
+
     print("looki-mcp: Verifying Looki base URL...", flush=True)
     verify_url = f"https://open.looki.ai/api/v1/verify?endpoint={base_url}"
     try:
@@ -131,6 +160,8 @@ async def load_and_validate_config() -> Config:
         public_url=public_url,
         origin_shared_secret=origin_shared_secret,
         user_timezone=user_timezone,
+        tls_cert_path=tls_cert_path,
+        tls_key_path=tls_key_path,
     )
     return _config
 

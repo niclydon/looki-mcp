@@ -153,6 +153,33 @@ the only ones that *compute* dates; everything else takes user-supplied
 
 ---
 
+## TLS / HTTPS Support
+
+**Decision:** Optional direct TLS via `LOOKI_TLS_CERT_PATH` and `LOOKI_TLS_KEY_PATH`
+env vars. When unset, the server binds plain HTTP and assumes a TLS-terminating
+reverse proxy is in front.
+
+**Why both modes:**
+- **Reverse proxy** (Cloudflare Tunnel, Caddy, nginx, Tailscale Funnel) is the
+  most common deployment pattern for personal MCP servers — easier cert
+  management (auto-renew, multi-host), and the server stays simple.
+- **Direct TLS** is needed for users who run on a single VPS without a proxy,
+  or in air-gapped environments where Let's Encrypt isn't reachable but they
+  have an internal CA.
+
+**Why not enforce HTTPS-only by default:**
+A "HTTPS-only" default would force every user to handle certs, which doesn't
+match how most people deploy MCP servers (proxy-fronted). Instead the README
+positions HTTPS as the recommended public-exposure mode and the startup banner
+makes it explicit which mode is active so misconfiguration is loud.
+
+**Why both vars (cert AND key):**
+Both must be set together or neither — half-set TLS config exits on startup
+with a clear error. Files are validated to exist before the server attempts
+to bind, so cert/key path typos fail fast rather than after a partial startup.
+
+---
+
 ## Per-Request httpx Client
 
 **Decision:** New `httpx.AsyncClient` per tool invocation via `async with get_client() as client:`
