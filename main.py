@@ -20,7 +20,9 @@ def run() -> None:
         print(f"[looki-mcp] Icon URL:       {config.public_url}/logo.ico", flush=True)
     else:
         print("[looki-mcp] Tip: Set LOOKI_MCP_BASE_URL to enable icon display in MCP clients", flush=True)
-    mcp.run(transport="http", host="0.0.0.0", port=config.port)
+    # show_banner=False suppresses the upstream "Deploy free: prefect.io" ad
+    # that FastMCP prints by default on HTTP startup.
+    mcp.run(transport="http", host="0.0.0.0", port=config.port, show_banner=False)
 
 
 if __name__ == "__main__":
