@@ -211,9 +211,14 @@ def register_convenience_tools(mcp: FastMCP) -> None:
             async with get_client() as client:
                 search_resp = await client.get("/moments/search", params=search_params)
                 search_data = unwrap(search_resp)
-                moments = (
-                    search_data.get("moments", []) if isinstance(search_data, dict) else []
-                )
+                # Looki search returns {"items": [...]}; tolerate the older
+                # "moments" key for forward compatibility in case the API ever changes.
+                if isinstance(search_data, dict):
+                    moments = search_data.get("items") or search_data.get("moments") or []
+                elif isinstance(search_data, list):
+                    moments = search_data
+                else:
+                    moments = []
                 moment_ids = [m["id"] for m in moments if isinstance(m, dict) and "id" in m]
 
                 detail_tasks = [client.get(f"/moments/{mid}") for mid in moment_ids]

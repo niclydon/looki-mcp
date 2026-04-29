@@ -66,7 +66,53 @@ ORIGIN_SHARED_SECRET=                                  # optional, request-level
 | `LOOKI_USER_TIMEZONE` | no | IANA timezone name (e.g. `America/New_York`) for "today"/"recent" date calculations. Defaults to UTC when unset. See [Timezone Handling](#timezone-handling) below. |
 | `LOOKI_TLS_CERT_PATH` | no | Path to TLS certificate file (PEM). When set together with `LOOKI_TLS_KEY_PATH`, the server serves HTTPS directly. See [TLS / HTTPS](#tls--https) below. |
 | `LOOKI_TLS_KEY_PATH` | no | Path to TLS private key file (PEM). Must be set together with `LOOKI_TLS_CERT_PATH`. |
-| `ORIGIN_SHARED_SECRET` | no | Shared secret required in the `x-origin-secret` header (TODO: not yet enforced) |
+| `ORIGIN_SHARED_SECRET` | no | Shared secret required in the `x-origin-secret` header on every request. Strongly recommended for any public deployment. See [Origin Secret](#origin-secret) below. |
+
+### Origin Secret
+
+`ORIGIN_SHARED_SECRET` is a simple but effective gate: every request to `/mcp`
+must include an `x-origin-secret: <value>` header that matches the env-var
+value, or the server returns `401 Unauthorized`.
+
+**Why you want this for public deployments:**
+Without the secret, the server URL itself is your only "auth" — anyone who
+discovers it can call your tools, drain your 60 req/min Looki rate limit, and
+read your captured memories. With it, even if someone finds the URL they
+can't make tool calls without the matching secret.
+
+**Generate a strong secret:**
+```bash
+openssl rand -hex 32
+# 64 hex chars — copy this into .env as ORIGIN_SHARED_SECRET=...
+```
+
+**Configure your MCP client to send the header.** In Claude Desktop's
+`claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "looki": {
+      "type": "http",
+      "url": "https://looki-mcp.example.com/mcp",
+      "headers": { "x-origin-secret": "your-64-char-hex-string" }
+    }
+  }
+}
+```
+
+In claude.ai's Integrations UI, add the same header field when configuring
+the MCP server.
+
+**What's exempt:** `/health` (so monitoring still works) and `/logo.ico` (so
+MCP clients can fetch the icon during pre-session metadata exchange).
+
+**What it does NOT replace:**
+- TLS — the secret is sent in cleartext over plain HTTP and can be sniffed.
+  Only meaningful when paired with HTTPS (direct or via reverse proxy).
+- Per-user auth — anyone with the secret can impersonate the legit client.
+
+The startup banner reports `Origin-secret guard ENABLED` or `DISABLED` so
+you can see which mode is active in your logs.
 
 ### TLS / HTTPS
 
