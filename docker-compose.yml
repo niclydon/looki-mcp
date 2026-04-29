@@ -1,0 +1,18 @@
+services:
+  looki-mcp:
+    build: .
+    ports:
+      - "${LOOKI_PORT:-3456}:${LOOKI_PORT:-3456}"
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:3456/health')"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
