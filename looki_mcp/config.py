@@ -10,11 +10,15 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from the project root (one level above the looki_mcp package),
+# so the server works whether started from the project dir or a subdir.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_PROJECT_ROOT / ".env")
 
 
 @dataclass
@@ -70,7 +74,7 @@ async def load_and_validate_config() -> Config:
         print(f"looki-mcp: Invalid LOOKI_PORT '{port_str}'. Must be a number 1-65535.", file=sys.stderr)
         sys.exit(1)
 
-    print("looki-mcp: Verifying Looki base URL...")
+    print("looki-mcp: Verifying Looki base URL...", flush=True)
     verify_url = f"https://open.looki.ai/api/v1/verify?endpoint={base_url}"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -91,7 +95,7 @@ async def load_and_validate_config() -> Config:
         print("  Check your internet connection and try again.", file=sys.stderr)
         sys.exit(1)
 
-    print("looki-mcp: Base URL verified OK.")
+    print("looki-mcp: Base URL verified OK.", flush=True)
     _config = Config(
         base_url=base_url,
         api_key=api_key,

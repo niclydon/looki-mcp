@@ -14,12 +14,12 @@ async def _startup() -> Config:
 
 def run() -> None:
     config = asyncio.run(_startup())
-    print(f"[looki-mcp] Server running on http://0.0.0.0:{config.port}/mcp ({TOOL_COUNT} tools)")
+    print(f"[looki-mcp] Server running on http://0.0.0.0:{config.port}/mcp ({TOOL_COUNT} tools)", flush=True)
     if config.public_url:
-        print(f"[looki-mcp] Public MCP URL: {config.public_url}/mcp")
-        print(f"[looki-mcp] Icon URL:       {config.public_url}/logo.ico")
+        print(f"[looki-mcp] Public MCP URL: {config.public_url}/mcp", flush=True)
+        print(f"[looki-mcp] Icon URL:       {config.public_url}/logo.ico", flush=True)
     else:
-        print("[looki-mcp] Tip: Set LOOKI_MCP_BASE_URL to enable icon display in MCP clients")
+        print("[looki-mcp] Tip: Set LOOKI_MCP_BASE_URL to enable icon display in MCP clients", flush=True)
     mcp.run(transport="http", host="0.0.0.0", port=config.port)
 
 
