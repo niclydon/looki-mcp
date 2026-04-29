@@ -239,6 +239,38 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
+## Deployment (systemd)
+
+If you're running on a Linux server and prefer systemd to Docker, a unit file
+ships in [`systemd/looki-mcp.service`](systemd/looki-mcp.service). Defaults
+assume `/services/looki-mcp` as the working directory and a `.venv` virtualenv
+inside that directory; adjust the paths and `User`/`Group` to match your setup.
+
+```bash
+# Place repo under /services
+sudo mkdir -p /services
+sudo chown $(id -un):$(id -gn) /services
+git clone https://github.com/yourusername/looki-mcp /services/looki-mcp
+cd /services/looki-mcp
+
+# Set up venv + deps
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+# Configure .env (copy from .env.example, fill in your credentials)
+cp .env.example .env
+# edit .env
+
+# Install + enable the unit
+sudo cp systemd/looki-mcp.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now looki-mcp.service
+
+# Check status / logs
+systemctl status looki-mcp
+journalctl -u looki-mcp -f
+```
+
 ## Deployment (Docker)
 
 Set your `.env`, then:

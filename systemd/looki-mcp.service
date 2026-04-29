@@ -1,0 +1,21 @@
+[Unit]
+Description=looki-mcp — MCP server for the Looki wearable camera API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=niclydon
+Group=niclydon
+WorkingDirectory=/services/looki-mcp
+EnvironmentFile=/services/looki-mcp/.env
+ExecStart=/services/looki-mcp/.venv/bin/python main.py
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=looki-mcp
+
+[Install]
+WantedBy=multi-user.target
