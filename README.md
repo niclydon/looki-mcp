@@ -37,11 +37,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Then download the Looki logo (one-time setup, used for the MCP icon):
-
-```bash
-python scripts/download_logo.py
-```
+The Looki logo (`assets/looki-logo.ico`) ships with the repo — nothing to fetch.
 
 ## Configuration
 
@@ -188,9 +184,9 @@ looki-mcp/
 │   ├── models.py          # Pydantic v2 response models
 │   ├── server.py          # FastMCP instance, custom routes, tool registration
 │   └── tools/             # Tool definitions (one module per category)
-├── assets/looki-logo.ico  # Served at /logo.ico for MCP icon display
+├── assets/looki-logo.ico  # Ships with repo, served at /logo.ico
 ├── scripts/
-│   ├── download_logo.py   # One-time logo download
+│   ├── download_logo.py   # Maintenance script — re-fetch logo if Looki updates it
 │   └── smoke_test.py      # Import/registration test (no .env needed)
 ├── main.py                # Entry point
 ├── requirements.txt

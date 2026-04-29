@@ -1,4 +1,7 @@
-"""Download the Looki favicon and save as assets/looki-logo.ico.
+"""Maintenance script to refresh assets/looki-logo.ico from the live Looki favicon.
+
+Not needed for normal install — the logo ships with the repo. Run this only if
+Looki updates their branding and the bundled icon needs to be replaced.
 
 Run: .venv/bin/python scripts/download_logo.py
 """
