@@ -56,14 +56,14 @@ async def load_and_validate_config() -> Config:
         print(f"\nlooki-mcp: Missing required environment variables: {', '.join(missing)}\n", file=sys.stderr)
         print("Setup:", file=sys.stderr)
         print("  1. Copy .env.example to .env", file=sys.stderr)
-        print("  2. LOOKI_BASE_URL — find this in the Looki app -> Settings -> Developer", file=sys.stderr)
-        print("  3. LOOKI_API_KEY  — your API key (starts with lk-)", file=sys.stderr)
+        print("  2. Generate your base URL and API key at https://web.looki.ai/api-keys", file=sys.stderr)
+        print("  3. Paste them into .env as LOOKI_BASE_URL and LOOKI_API_KEY", file=sys.stderr)
         print("  4. Run: python main.py\n", file=sys.stderr)
         sys.exit(1)
 
     if not api_key.startswith("lk-"):
         print("looki-mcp: LOOKI_API_KEY must start with 'lk-'", file=sys.stderr)
-        print("  Check the Looki app -> Settings -> Developer for your API key.", file=sys.stderr)
+        print("  Generate your API key at https://web.looki.ai/api-keys", file=sys.stderr)
         sys.exit(1)
 
     try:

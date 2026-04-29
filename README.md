@@ -23,8 +23,8 @@ exposes your Looki data through 12 tools that AI assistants can use to answer qu
 
 ## Getting Your Credentials
 
-1. Open the Looki app or go to [web.looki.ai](https://web.looki.ai)
-2. Navigate to **Settings → Developer**
+1. Go to [web.looki.ai/api-keys](https://web.looki.ai/api-keys)
+2. Generate a new API key (or use an existing one)
 3. Copy your **Base URL** and **API Key** (starts with `lk-`)
 
 ## Installation
@@ -59,7 +59,7 @@ ORIGIN_SHARED_SECRET=                                  # optional, request-level
 
 | Variable | Required | Description |
 |---|---|---|
-| `LOOKI_BASE_URL` | yes | Your Looki API base URL (Looki app → Settings → Developer) |
+| `LOOKI_BASE_URL` | yes | Your Looki API base URL — generate at [web.looki.ai/api-keys](https://web.looki.ai/api-keys) |
 | `LOOKI_API_KEY` | yes | API key starting with `lk-` |
 | `LOOKI_PORT` | no | HTTP port for the server (default: `3456`) |
 | `LOOKI_MCP_BASE_URL` | no | Public URL of this server, used for icon display in MCP clients |
@@ -159,7 +159,7 @@ error message when this limit is reached so the AI assistant can suggest waiting
 → Ensure `.env` exists in the project directory and both `LOOKI_BASE_URL` and `LOOKI_API_KEY` are set.
 
 **"Base URL verification failed"**
-→ Copy `LOOKI_BASE_URL` exactly from Looki app → Settings → Developer. Even a trailing slash mismatch will fail verification.
+→ Copy `LOOKI_BASE_URL` exactly as shown at [web.looki.ai/api-keys](https://web.looki.ai/api-keys). Even a trailing slash mismatch will fail verification.
 
 **"LOOKI_API_KEY must start with lk-"**
 → Verify you copied the API key, not the base URL.
