@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+import zoneinfo
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,6 +29,7 @@ class Config:
     port: int
     public_url: str | None
     origin_shared_secret: str | None
+    user_timezone: str | None
 
 
 _config: Config | None = None
@@ -45,6 +47,7 @@ async def load_and_validate_config() -> Config:
     port_str = os.getenv("LOOKI_PORT", "3456")
     public_url = os.getenv("LOOKI_MCP_BASE_URL", "").strip() or None
     origin_shared_secret = os.getenv("ORIGIN_SHARED_SECRET", "").strip() or None
+    user_timezone = os.getenv("LOOKI_USER_TIMEZONE", "").strip() or None
 
     missing: list[str] = []
     if not base_url:
@@ -73,6 +76,24 @@ async def load_and_validate_config() -> Config:
     except ValueError:
         print(f"looki-mcp: Invalid LOOKI_PORT '{port_str}'. Must be a number 1-65535.", file=sys.stderr)
         sys.exit(1)
+
+    if user_timezone:
+        try:
+            zoneinfo.ZoneInfo(user_timezone)
+        except Exception:
+            print(
+                f"looki-mcp: Invalid LOOKI_USER_TIMEZONE '{user_timezone}'.",
+                file=sys.stderr,
+            )
+            print(
+                "  Use an IANA name like 'America/New_York', 'Europe/London', or 'UTC'.",
+                file=sys.stderr,
+            )
+            print(
+                "  See: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     print("looki-mcp: Verifying Looki base URL...", flush=True)
     verify_url = f"https://open.looki.ai/api/v1/verify?endpoint={base_url}"
@@ -109,6 +130,7 @@ async def load_and_validate_config() -> Config:
         port=port,
         public_url=public_url,
         origin_shared_secret=origin_shared_secret,
+        user_timezone=user_timezone,
     )
     return _config
 

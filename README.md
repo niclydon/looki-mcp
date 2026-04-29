@@ -63,7 +63,44 @@ ORIGIN_SHARED_SECRET=                                  # optional, request-level
 | `LOOKI_API_KEY` | yes | API key starting with `lk-` |
 | `LOOKI_PORT` | no | HTTP port for the server (default: `3456`) |
 | `LOOKI_MCP_BASE_URL` | no | Public URL of this server, used for icon display in MCP clients |
+| `LOOKI_USER_TIMEZONE` | no | IANA timezone name (e.g. `America/New_York`) for "today"/"recent" date calculations. Defaults to UTC when unset. See [Timezone Handling](#timezone-handling) below. |
 | `ORIGIN_SHARED_SECRET` | no | Shared secret required in the `x-origin-secret` header (TODO: not yet enforced) |
+
+### Timezone Handling
+
+Most tools take explicit `YYYY-MM-DD` dates as arguments and pass them through to the
+Looki API verbatim — those tools are timezone-agnostic.
+
+The two convenience tools that compute dates themselves (`get_recent_activity`,
+`get_todays_moments`) need to know what "today" means. Behavior:
+
+- **`LOOKI_USER_TIMEZONE` set** (e.g. `America/New_York`): "today" is the current
+  date in that timezone. The value is validated on startup against `zoneinfo` —
+  invalid names cause the server to exit with a clear error.
+- **`LOOKI_USER_TIMEZONE` unset**: "today" is the current UTC date.
+
+Either way, every response from these tools includes **both** `*_local` and `*_utc`
+date fields plus the configured `timezone` name, so the AI assistant or human consumer
+can always see exactly which calendar boundary was used. Example response from
+`get_todays_moments`:
+
+```json
+{
+  "date_local": "2026-04-29",
+  "date_utc":   "2026-04-30",
+  "timezone":   "America/New_York",
+  "moments":    [ ... ]
+}
+```
+
+Why a server-level setting (not per-request)? The typical deployment is one user
+running their own MCP server. The user knows their own timezone once at deploy
+time. A public MCP server has no reliable way to detect the consumer's timezone
+across firewalls/proxies/cloud deploys, so an explicit env var beats guessing.
+
+If you're sharing one server across multiple users in different timezones, leave
+`LOOKI_USER_TIMEZONE` unset — UTC is the only correct shared default — and have the
+AI assistant convert in the conversation.
 
 ## Running
 

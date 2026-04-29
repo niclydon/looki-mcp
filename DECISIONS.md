@@ -122,6 +122,37 @@ the server works in offline / air-gapped environments and is not dependent on
 
 ---
 
+## Timezone Handling: Optional Server-Level Setting
+
+**Decision:** Optional `LOOKI_USER_TIMEZONE` env var (IANA name). When unset,
+the two date-computing convenience tools default to UTC. Responses always
+include both `*_local` and `*_utc` dates plus the resolved timezone name.
+
+**Why:**
+The typical deployment is one user running their own MCP server. They know
+their timezone at deploy time and can set it once. A public MCP server has
+no reliable way to detect the consumer's timezone — the request comes through
+firewalls, proxies, and cloud deploys that all strip or rewrite timezone
+hints, and HTTP itself has no useful equivalent of a "user timezone" header.
+
+A server-level env var is:
+- Explicit (no magic detection)
+- Validated on startup via `zoneinfo` (bad values fail fast)
+- Easy to omit for shared/multi-user deployments where UTC is the only safe shared default
+- Discoverable (documented in README and `.env.example`)
+
+We deliberately do **not** try to handle Looki's per-moment `tz` field (which
+uses UTC offsets like `-04:00`) as the server's timezone. That field is
+attached to individual captured moments and travels with them; it isn't a
+property of the user. We pass it through unchanged so the AI assistant can
+reason about each moment's local time independently.
+
+The two convenience tools (`get_recent_activity`, `get_todays_moments`) are
+the only ones that *compute* dates; everything else takes user-supplied
+`YYYY-MM-DD` arguments verbatim, so timezone never enters the picture.
+
+---
+
 ## Per-Request httpx Client
 
 **Decision:** New `httpx.AsyncClient` per tool invocation via `async with get_client() as client:`

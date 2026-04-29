@@ -1,66 +1,101 @@
 """Convenience composite tools: recent_activity, todays_moments, moment_with_media, search_with_details.
 
-Note on dates: all "today" / "N days ago" calculations use UTC. The Looki API stores
-moments with their own `tz` field per moment; this server does not localize requests
-to the user's timezone. Tool docstrings make this explicit so the AI assistant can
-warn the user when the boundary matters (e.g., near midnight local time).
+Date semantics:
+- All "today" / "N days ago" calculations use the user's configured timezone
+  (LOOKI_USER_TIMEZONE env var, IANA name like "America/New_York"). When the
+  variable is unset, calculations use UTC.
+- Tool responses include BOTH `*_local` and `*_utc` date fields so consumers
+  can see exactly what the server queried with and reason about boundaries.
+- The Looki API itself returns moments tagged with their own per-moment `tz`
+  field; this server does not transform those values.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import zoneinfo
 from datetime import datetime, timedelta, timezone
 
 from fastmcp import FastMCP
 
 from looki_mcp.client import format_error, get_client, unwrap
+from looki_mcp.config import get_config
 
 
 def _today_utc() -> str:
-    """Returns today's date in UTC as YYYY-MM-DD."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def _days_ago_utc(days: int) -> str:
-    """Returns the date N days ago (UTC) as YYYY-MM-DD."""
-    return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+def _today_local() -> str:
+    """Returns today's date in the configured user timezone, or UTC if unset."""
+    tz_name = get_config().user_timezone
+    if tz_name is None:
+        return _today_utc()
+    return datetime.now(zoneinfo.ZoneInfo(tz_name)).strftime("%Y-%m-%d")
+
+
+def _days_ago_local(days: int) -> str:
+    """Returns the date N days ago in the configured user timezone, or UTC if unset."""
+    tz_name = get_config().user_timezone
+    if tz_name is None:
+        return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    now_local = datetime.now(zoneinfo.ZoneInfo(tz_name))
+    return (now_local - timedelta(days=days)).strftime("%Y-%m-%d")
+
+
+def _date_envelope(local_field: str, utc_field: str) -> dict[str, str]:
+    """Build a small descriptor: {local_field: <local>, utc_field: <utc>, timezone: <name>}."""
+    tz = get_config().user_timezone
+    return {
+        local_field: _today_local() if "today" in local_field else _today_utc(),
+        utc_field: _today_utc(),
+        "timezone": tz or "UTC",
+    }
 
 
 def register_convenience_tools(mcp: FastMCP) -> None:
     @mcp.tool
     async def get_recent_activity(days: int = 7) -> str:
         """
-        Returns a calendar summary for the last N days ending today (UTC). Use for
-        "what have I been up to lately?", "how active was I this week?", or any
+        Returns a calendar summary for the last N days ending today. Uses the server's
+        configured timezone (LOOKI_USER_TIMEZONE) for "today"; defaults to UTC if unset.
+        Use for "what have I been up to lately?", "how active was I this week?", or any
         question about recent activity patterns without knowing specific dates.
 
-        Note: dates are calculated in UTC. If the user is in a timezone where the
-        current local date differs from UTC, results near midnight may include or
-        exclude moments compared to what they'd expect locally. Use
-        `get_moments_calendar` with explicit dates if exact local boundaries matter.
+        The response includes the date range it queried with under `period`, with both
+        local (server-configured TZ) and UTC values so consumers can see exactly what
+        boundary was used.
 
         Args:
             days: Number of days to look back. Between 1 and 90, default 7.
         """
         if not (1 <= days <= 90):
             return "Error: days must be between 1 and 90."
-        end_date = _today_utc()
-        start_date = _days_ago_utc(days)
+        tz = get_config().user_timezone or "UTC"
+        end_date_local = _today_local()
+        start_date_local = _days_ago_local(days)
+        end_date_utc = _today_utc()
+        start_date_utc = (datetime.now(timezone.utc) - timedelta(days=days)).strftime(
+            "%Y-%m-%d"
+        )
         try:
             async with get_client() as client:
                 response = await client.get(
                     "/moments/calendar",
-                    params={"start_date": start_date, "end_date": end_date},
+                    params={"start_date": start_date_local, "end_date": end_date_local},
                 )
                 data = unwrap(response)
                 payload = data if isinstance(data, dict) else {"data": data}
                 return json.dumps(
                     {
                         "period": {
-                            "start_date_utc": start_date,
-                            "end_date_utc": end_date,
                             "days": days,
+                            "timezone": tz,
+                            "start_date_local": start_date_local,
+                            "end_date_local": end_date_local,
+                            "start_date_utc": start_date_utc,
+                            "end_date_utc": end_date_utc,
                         },
                         **payload,
                     },
@@ -72,19 +107,30 @@ def register_convenience_tools(mcp: FastMCP) -> None:
     @mcp.tool
     async def get_todays_moments() -> str:
         """
-        Returns all moments captured today (UTC) — i.e. with a `date` of the current
-        UTC calendar day. Use for "what did I do today?" or "show me today's memories".
+        Returns all moments captured today. "Today" is computed in the server's
+        configured timezone (LOOKI_USER_TIMEZONE), or UTC if that env var is unset.
+        Use for "what did I do today?" or "show me today's memories".
 
-        Note: this is UTC, not the user's local timezone. If the user wants strict
-        local-day boundaries, use `get_moments_by_date` with their preferred YYYY-MM-DD.
+        The response includes both `date_local` and `date_utc` so consumers can see
+        which calendar day was queried.
         """
-        date = _today_utc()
+        tz = get_config().user_timezone or "UTC"
+        date_local = _today_local()
+        date_utc = _today_utc()
         try:
             async with get_client() as client:
-                response = await client.get("/moments", params={"on_date": date})
+                response = await client.get("/moments", params={"on_date": date_local})
                 data = unwrap(response)
                 payload = data if isinstance(data, dict) else {"data": data}
-                return json.dumps({"date_utc": date, **payload}, indent=2)
+                return json.dumps(
+                    {
+                        "date_local": date_local,
+                        "date_utc": date_utc,
+                        "timezone": tz,
+                        **payload,
+                    },
+                    indent=2,
+                )
         except Exception as exc:
             return f"Error: {format_error(exc)}"
 
@@ -137,6 +183,9 @@ def register_convenience_tools(mcp: FastMCP) -> None:
         Runs a natural language search and automatically fetches full details for each
         result in one call. Returns richer results than raw search. Use when the user
         wants to find AND read about memories in a single step.
+
+        Date arguments are passed through verbatim; this tool does not apply timezone
+        conversion to user-supplied dates. Use whatever date the user gave you.
 
         Args:
             query: Natural language description of what to find. Between 1 and 100 characters.
