@@ -115,5 +115,4 @@ class RealtimeEventResponse(BaseModel):
 
 
 class VerifyResponse(BaseModel):
-    valid: bool
-    message: str | None = None
+    status: str

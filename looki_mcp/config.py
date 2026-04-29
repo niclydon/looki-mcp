@@ -81,13 +81,20 @@ async def load_and_validate_config() -> Config:
             response = await client.get(verify_url)
             response.raise_for_status()
             data = response.json()
-            if not data.get("valid"):
-                msg = data.get("message", "Invalid endpoint")
-                print(f"looki-mcp: Base URL verification failed: {msg}", file=sys.stderr)
+            # Success response: {"status": "ok"}
+            if data.get("status") != "ok":
+                detail = data.get("detail") or data.get("message") or "endpoint not accepted"
+                print(f"looki-mcp: Base URL verification failed: {detail}", file=sys.stderr)
                 print("  Check that LOOKI_BASE_URL matches exactly what the Looki app shows.", file=sys.stderr)
                 sys.exit(1)
     except httpx.HTTPStatusError as exc:
-        print(f"looki-mcp: Base URL rejected by Looki (HTTP {exc.response.status_code}).", file=sys.stderr)
+        # Failure responses look like: 403 {"code":104,"detail":"domain not allowed",...}
+        try:
+            err_body = exc.response.json()
+            detail = err_body.get("detail") or err_body.get("message") or "rejected"
+        except Exception:
+            detail = exc.response.text[:120] or "rejected"
+        print(f"looki-mcp: Base URL rejected by Looki (HTTP {exc.response.status_code}): {detail}", file=sys.stderr)
         print("  Check your LOOKI_BASE_URL value.", file=sys.stderr)
         sys.exit(1)
     except httpx.RequestError as exc:

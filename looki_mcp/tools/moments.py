@@ -6,7 +6,7 @@ import json
 
 from fastmcp import FastMCP
 
-from looki_mcp.client import format_error, get_client
+from looki_mcp.client import format_error, get_client, unwrap
 
 
 def register_moments_tools(mcp: FastMCP) -> None:
@@ -27,8 +27,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
                     "/moments/calendar",
                     params={"start_date": start_date, "end_date": end_date},
                 )
-                response.raise_for_status()
-                return json.dumps(response.json(), indent=2)
+                return json.dumps(unwrap(response), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"
 
@@ -45,8 +44,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
         try:
             async with get_client() as client:
                 response = await client.get("/moments", params={"on_date": date})
-                response.raise_for_status()
-                return json.dumps(response.json(), indent=2)
+                return json.dumps(unwrap(response), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"
 
@@ -63,8 +61,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
         try:
             async with get_client() as client:
                 response = await client.get(f"/moments/{moment_id}")
-                response.raise_for_status()
-                return json.dumps(response.json(), indent=2)
+                return json.dumps(unwrap(response), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"
 
@@ -97,8 +94,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
                 params["cursor_id"] = cursor_id
             async with get_client() as client:
                 response = await client.get(f"/moments/{moment_id}/files", params=params)
-                response.raise_for_status()
-                return json.dumps(response.json(), indent=2)
+                return json.dumps(unwrap(response), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"
 
@@ -139,7 +135,6 @@ def register_moments_tools(mcp: FastMCP) -> None:
                 params["end_date"] = end_date
             async with get_client() as client:
                 response = await client.get("/moments/search", params=params)
-                response.raise_for_status()
-                return json.dumps(response.json(), indent=2)
+                return json.dumps(unwrap(response), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"

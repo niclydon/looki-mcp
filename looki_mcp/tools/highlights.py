@@ -6,7 +6,7 @@ import json
 
 from fastmcp import FastMCP
 
-from looki_mcp.client import format_error, get_client
+from looki_mcp.client import format_error, get_client, unwrap
 
 
 def register_highlights_tools(mcp: FastMCP) -> None:
@@ -64,7 +64,6 @@ def register_highlights_tools(mcp: FastMCP) -> None:
                 params["cursor_id"] = cursor_id
             async with get_client() as client:
                 response = await client.get("/for_you/items", params=params)
-                response.raise_for_status()
-                return json.dumps(response.json(), indent=2)
+                return json.dumps(unwrap(response), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"

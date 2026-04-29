@@ -6,7 +6,7 @@ import json
 
 from fastmcp import FastMCP
 
-from looki_mcp.client import format_error, get_client
+from looki_mcp.client import format_error, get_client, unwrap
 
 
 def register_realtime_tools(mcp: FastMCP) -> None:
@@ -21,7 +21,6 @@ def register_realtime_tools(mcp: FastMCP) -> None:
         try:
             async with get_client() as client:
                 response = await client.get("/realtime/latest-event")
-                response.raise_for_status()
-                return json.dumps(response.json(), indent=2)
+                return json.dumps(unwrap(response), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"
