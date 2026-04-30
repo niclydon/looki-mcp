@@ -1,8 +1,14 @@
-"""Entry point: validate config, then run the FastMCP HTTP server."""
+"""Entry point: validate config, then run the FastMCP HTTP server.
+
+Subcommands:
+  (none)   start the server (default)
+  setup    interactive wizard to populate .env
+"""
 
 from __future__ import annotations
 
 import asyncio
+import sys
 
 from starlette.middleware import Middleware
 
@@ -16,6 +22,12 @@ async def _startup() -> Config:
 
 
 def run() -> None:
+    # Subcommand dispatch — keeps "one command to remember" UX.
+    if len(sys.argv) > 1 and sys.argv[1] == "setup":
+        from looki_mcp.setup_wizard import main as setup_main
+
+        sys.exit(asyncio.run(setup_main()))
+
     config = asyncio.run(_startup())
     scheme = config.scheme
     print(

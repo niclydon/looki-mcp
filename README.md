@@ -35,17 +35,41 @@ cd looki-mcp
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python main.py setup        # interactive credentials wizard
+python main.py              # start the server
 ```
 
 The Looki logo (`assets/looki-logo.ico`) ships with the repo — nothing to fetch.
 
 ## Configuration
 
+The easiest path is the **interactive wizard** — it prompts for your credentials,
+verifies them against the live Looki API, auto-generates a strong origin secret
+if you want one, and writes a properly-permissioned `.env` for you:
+
+```bash
+python main.py setup
+```
+
+The wizard:
+- Asks for your Looki base URL and API key (the API key prompt hides your typing)
+- Validates them by calling `/me` against your account, so typos fail fast
+- Asks for optional settings (port, timezone, public URL) with sensible defaults
+- Offers to auto-generate `ORIGIN_SHARED_SECRET` so you don't have to think about it
+- Re-running the wizard preserves your existing values as defaults — press Enter to keep them
+- Writes `.env` with mode `600` (owner read/write only)
+
+You can re-run `python main.py setup` any time to update credentials.
+
+### Manual configuration
+
+If you'd rather edit a file directly:
+
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your credentials:
+Edit `.env`:
 
 ```
 LOOKI_BASE_URL=https://your-looki-base-url
