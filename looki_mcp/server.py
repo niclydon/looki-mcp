@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastmcp import FastMCP
+from mcp.types import Icon
 from starlette.responses import FileResponse, JSONResponse
 
 from looki_mcp.tools.convenience import register_convenience_tools
@@ -17,8 +19,23 @@ TOOL_COUNT = 12
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 
+# We construct the FastMCP instance at import time, before config validation
+# runs. So the icon URL is read directly from the env var rather than from the
+# loaded Config object — no functional difference, but keeps the import order
+# clean. If LOOKI_MCP_BASE_URL is unset, no icons are advertised; clients
+# fall back to /favicon.ico from the host.
+_PUBLIC_URL = os.environ.get("LOOKI_MCP_BASE_URL", "").strip()
+_icons: list[Icon] | None = (
+    [Icon(src=f"{_PUBLIC_URL}/logo.ico", mimeType="image/x-icon")]
+    if _PUBLIC_URL
+    else None
+)
+
 mcp = FastMCP(
     name="looki-mcp",
+    version="1.0.0",
+    website_url="https://web.looki.ai",
+    icons=_icons,
     instructions=(
         "This server provides access to the user's Looki wearable camera memories. "
         "Use search_moments for natural language queries about specific memories. "
