@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -18,6 +19,20 @@ from looki_mcp.tools.realtime import register_realtime_tools
 TOOL_COUNT = 12
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
+LOGO_PATH = ASSETS_DIR / "looki-logo.ico"
+
+
+def _logo_cache_key() -> str:
+    """8-char hex hash of the logo bytes — used as ?v= cache buster on the icon URL.
+
+    Changes whenever the logo file changes, stable across restarts otherwise.
+    Lets MCP clients (claude.ai etc.) bypass their own caches when we update
+    the asset, without forcing the user to re-add the connector.
+    """
+    if not LOGO_PATH.exists():
+        return "0"
+    return hashlib.sha256(LOGO_PATH.read_bytes()).hexdigest()[:8]
+
 
 # We construct the FastMCP instance at import time, before config validation
 # runs. So the icon URL is read directly from the env var rather than from the
@@ -26,7 +41,7 @@ ASSETS_DIR = Path(__file__).parent.parent / "assets"
 # fall back to /favicon.ico from the host.
 _PUBLIC_URL = os.environ.get("LOOKI_MCP_BASE_URL", "").strip()
 _icons: list[Icon] | None = (
-    [Icon(src=f"{_PUBLIC_URL}/logo.ico", mimeType="image/x-icon")]
+    [Icon(src=f"{_PUBLIC_URL}/logo.ico?v={_logo_cache_key()}", mimeType="image/x-icon")]
     if _PUBLIC_URL
     else None
 )
