@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=niclydon
-Group=niclydon
-WorkingDirectory=/services/looki-mcp
-EnvironmentFile=/services/looki-mcp/.env
-ExecStart=/services/looki-mcp/.venv/bin/python main.py
+User=looki
+Group=looki
+WorkingDirectory=/opt/looki-mcp
+EnvironmentFile=/opt/looki-mcp/.env
+ExecStart=/opt/looki-mcp/.venv/bin/python /opt/looki-mcp/main.py
 Restart=always
 RestartSec=10
 StartLimitIntervalSec=0

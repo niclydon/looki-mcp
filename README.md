@@ -7,7 +7,7 @@ memories, moments, photos, and AI-generated highlights.
 ## What It Does
 
 Looki L1 is a wearable camera that passively captures your daily life. This MCP server
-exposes your Looki data through 12 tools that AI assistants can use to answer questions like:
+exposes your Looki data through 13 tools that AI assistants can use to answer questions like:
 
 - "What did I do last Thursday?"
 - "Find the moment where I was at the coffee shop"
@@ -20,6 +20,7 @@ exposes your Looki data through 12 tools that AI assistants can use to answer qu
 - **Python** 3.11 or later (or Docker)
 - A **Looki account** with an L1 device
 - Your Looki **base URL** and **API key** (see below)
+- **ffmpeg** if you want to use `extract_video_frames`
 
 ## Getting Your Credentials
 
@@ -91,6 +92,7 @@ ORIGIN_SHARED_SECRET=                                  # optional, request-level
 | `LOOKI_TLS_CERT_PATH` | no | Path to TLS certificate file (PEM). When set together with `LOOKI_TLS_KEY_PATH`, the server serves HTTPS directly. See [TLS / HTTPS](#tls--https) below. |
 | `LOOKI_TLS_KEY_PATH` | no | Path to TLS private key file (PEM). Must be set together with `LOOKI_TLS_CERT_PATH`. |
 | `ORIGIN_SHARED_SECRET` | no | Shared secret required in the `x-origin-secret` header on every request. Strongly recommended for any public deployment. See [Origin Secret](#origin-secret) below. |
+| `FFMPEG_BIN` | no | Path to the `ffmpeg` binary for `extract_video_frames` (default: `ffmpeg` on `PATH`). |
 
 ### Origin Secret
 
@@ -137,6 +139,12 @@ MCP clients can fetch the icon during pre-session metadata exchange).
 
 The startup banner reports `Origin-secret guard ENABLED` or `DISABLED` so
 you can see which mode is active in your logs.
+
+### Optional Video Extras
+
+`extract_video_frames` shells out to `ffmpeg` to sample stills from a Looki
+video file. If `ffmpeg` is unavailable, the base server still runs and that
+tool returns a clear error instead of crashing startup.
 
 ### TLS / HTTPS
 
@@ -233,7 +241,7 @@ Expected startup output:
 ```
 looki-mcp: Verifying Looki base URL...
 looki-mcp: Base URL verified OK.
-[looki-mcp] Server running on http://0.0.0.0:3456/mcp (12 tools)
+[looki-mcp] Server running on http://0.0.0.0:3456/mcp (13 tools)
 ```
 
 The server validates your credentials before accepting connections — if anything is
@@ -245,7 +253,7 @@ error message explaining what to fix.
 ### claude.ai
 
 1. Go to **Settings → Integrations → Add MCP Server**
-2. Enter your server URL: `http://your-server:3456/mcp`
+2. Enter your server URL: `https://your-server.example.com/mcp`
 3. The Looki logo will appear if `LOOKI_MCP_BASE_URL` is set
 
 ### Claude Desktop (remote HTTP)
@@ -257,7 +265,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "looki": {
       "type": "http",
-      "url": "http://your-server:3456/mcp"
+      "url": "https://your-server.example.com/mcp"
     }
   }
 }
@@ -267,15 +275,17 @@ Add to `claude_desktop_config.json`:
 
 If you're running on a Linux server and prefer systemd to Docker, a unit file
 ships in [`systemd/looki-mcp.service`](systemd/looki-mcp.service). Defaults
-assume `/services/looki-mcp` as the working directory and a `.venv` virtualenv
-inside that directory; adjust the paths and `User`/`Group` to match your setup.
+assume `/opt/looki-mcp` as the working directory, a dedicated `looki` service
+account, and a `.venv` virtualenv inside that directory; adjust the paths and
+`User`/`Group` to match your setup.
 
 ```bash
-# Place repo under /services
-sudo mkdir -p /services
-sudo chown $(id -un):$(id -gn) /services
-git clone https://github.com/yourusername/looki-mcp /services/looki-mcp
-cd /services/looki-mcp
+# Place repo under /opt and create a dedicated service account
+sudo useradd --system --create-home --shell /usr/sbin/nologin looki || true
+sudo mkdir -p /opt/looki-mcp
+sudo chown looki:looki /opt/looki-mcp
+git clone https://github.com/yourusername/looki-mcp /opt/looki-mcp
+cd /opt/looki-mcp
 
 # Set up venv + deps
 python3 -m venv .venv
@@ -327,12 +337,13 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `get_todays_moments` | All moments captured today (user TZ) | — |
 | `get_moment_with_media` | Moment + media in one call | `moment_id`, `highlight_only` |
 | `search_moments_with_details` | Search + fetch details in one call | `query`, `max_results` |
+| `extract_video_frames` | Sample still frames from a moment's video file | `moment_id`, `max_frames` |
 
 ## Health Endpoint
 
 ```
 GET /health
-{"status":"ok","server":"looki-mcp","version":"1.0.0","tools":12}
+{"status":"ok","server":"looki-mcp","version":"1.0.0","tools":13}
 ```
 
 Useful for Docker healthchecks, load balancers, and uptime monitoring.
@@ -358,7 +369,7 @@ error message when this limit is reached so the AI assistant can suggest waiting
 
 **Icon not showing in MCP client**
 → Set `LOOKI_MCP_BASE_URL` to your public server URL (e.g. `https://looki-mcp.example.com`).
-→ Confirm `/logo.ico` is accessible: `curl http://your-server:3456/logo.ico`
+→ Confirm `/logo.ico` is accessible: `curl https://your-server.example.com/logo.ico`
 
 **`fastmcp` not found / ImportError on startup**
 → Activate your virtualenv: `source .venv/bin/activate` and re-run `pip install -r requirements.txt`.
