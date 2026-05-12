@@ -17,7 +17,7 @@ from looki_mcp.tools.profile import register_profile_tools
 from looki_mcp.tools.realtime import register_realtime_tools
 from looki_mcp.tools.video import register_video_tools
 
-TOOL_COUNT = 13
+TOOL_COUNT = 14
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 LOGO_PATH = ASSETS_DIR / "looki-logo.ico"
