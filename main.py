@@ -31,7 +31,7 @@ def run() -> None:
     config = asyncio.run(_startup())
     scheme = config.scheme
     print(
-        f"[looki-mcp] Server running on {scheme}://0.0.0.0:{config.port}/mcp ({TOOL_COUNT} tools)",
+        f"[looki-mcp] Server running on {scheme}://{config.bind_host}:{config.port}/mcp ({TOOL_COUNT} tools)",
         flush=True,
     )
     if config.tls_enabled:
@@ -79,7 +79,7 @@ def run() -> None:
 
     mcp.run(
         transport="http",
-        host="0.0.0.0",
+        host=config.bind_host,
         port=config.port,
         show_banner=False,
         uvicorn_config=uvicorn_config,

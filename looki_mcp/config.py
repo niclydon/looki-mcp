@@ -27,6 +27,7 @@ class Config:
     base_url: str
     api_key: str
     port: int
+    bind_host: str
     public_url: str | None
     origin_shared_secret: str | None
     user_timezone: str | None
@@ -55,6 +56,7 @@ async def load_and_validate_config() -> Config:
     base_url = os.getenv("LOOKI_BASE_URL", "").strip()
     api_key = os.getenv("LOOKI_API_KEY", "").strip()
     port_str = os.getenv("LOOKI_PORT", "3456")
+    bind_host = os.getenv("LOOKI_BIND_HOST", "0.0.0.0").strip() or "0.0.0.0"
     public_url = os.getenv("LOOKI_MCP_BASE_URL", "").strip() or None
     origin_shared_secret = os.getenv("ORIGIN_SHARED_SECRET", "").strip() or None
     user_timezone = os.getenv("LOOKI_USER_TIMEZONE", "").strip() or None
@@ -157,6 +159,7 @@ async def load_and_validate_config() -> Config:
         base_url=base_url,
         api_key=api_key,
         port=port,
+        bind_host=bind_host,
         public_url=public_url,
         origin_shared_secret=origin_shared_secret,
         user_timezone=user_timezone,
