@@ -1,7 +1,7 @@
 """Integration test: call get_profile against a running looki-mcp via the MCP protocol.
 
-Requires the server to be running on http://localhost:3456/mcp.
-Uses fastmcp's client which handles MCP session initialization.
+Requires the server to be running on http://localhost:3456/mcp (or the LOOKI_PORT
+you used). Uses fastmcp's client which handles MCP session initialization.
 
 Run: .venv/bin/python scripts/integration_test.py
 """

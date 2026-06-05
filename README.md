@@ -7,7 +7,7 @@ memories, moments, photos, and AI-generated highlights.
 ## What It Does
 
 Looki L1 is a wearable camera that passively captures your daily life. This MCP server
-exposes your Looki data through 13 tools that AI assistants can use to answer questions like:
+exposes your Looki data through 14 tools that AI assistants can use to answer questions like:
 
 - "What did I do last Thursday?"
 - "Find the moment where I was at the coffee shop"
@@ -347,6 +347,7 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `search_moments` | Natural language memory search | `query`, `start_date`, `end_date` |
 | `get_highlights` | AI-generated highlights (comics, vlogs) | `group`, `liked`, `limit` |
 | `get_realtime_event` | Current real-time detection (beta) | — |
+| `describe_realtime_event` | Latest realtime + optional Forge VLM one-sentence visual description (if snapshot + Forge configured) | — |
 | `get_recent_activity` | Calendar summary for last N days | `days` |
 | `get_todays_moments` | All moments captured today (user TZ) | — |
 | `get_moment_with_media` | Moment + media in one call | `moment_id`, `highlight_only` |
@@ -357,7 +358,7 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 
 ```
 GET /health
-{"status":"ok","server":"looki-mcp","version":"1.0.0","tools":13}
+{"status":"ok","server":"looki-mcp","version":"1.0.0","tools":14}
 ```
 
 Useful for Docker healthchecks, load balancers, and uptime monitoring.

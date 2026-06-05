@@ -44,16 +44,6 @@ def _days_ago_local(days: int) -> str:
     return (now_local - timedelta(days=days)).strftime("%Y-%m-%d")
 
 
-def _date_envelope(local_field: str, utc_field: str) -> dict[str, str]:
-    """Build a small descriptor: {local_field: <local>, utc_field: <utc>, timezone: <name>}."""
-    tz = get_config().user_timezone
-    return {
-        local_field: _today_local() if "today" in local_field else _today_utc(),
-        utc_field: _today_utc(),
-        "timezone": tz or "UTC",
-    }
-
-
 def register_convenience_tools(mcp: FastMCP) -> None:
     @mcp.tool
     async def get_recent_activity(days: int = 7) -> str:

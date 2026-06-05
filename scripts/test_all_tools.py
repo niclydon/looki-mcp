@@ -1,9 +1,11 @@
 """Run every registered tool against a running looki-mcp server.
 
-Server must be running on http://localhost:3456/mcp with valid credentials.
+Server must be running on http://localhost:3456/mcp (default) with valid credentials.
 
 For each tool, prints a header, the call result (truncated), and PASS/FAIL.
 Tools that need a moment_id chain off the result of search_moments / calendar.
+Covers all 14 tools (dynamic count from server + explicit calls for the two
+post-1.0 additions: describe_realtime_event + extract_video_frames).
 
 Run: .venv/bin/python scripts/test_all_tools.py
 """
@@ -18,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from fastmcp import Client
 
 
-SERVER_URL = "http://localhost:3456/mcp"
+SERVER_URL = "http://localhost:3456/mcp"  # default; override in env if testing custom LOOKI_PORT/LOOKI_BIND_HOST
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
 SKIP = "\033[33mSKIP\033[0m"
@@ -104,7 +106,7 @@ async def main() -> int:
         print("=" * 80)
 
         # 1. get_profile
-        print("\n[1/12] get_profile()")
+        print("\n[1/14] get_profile()")
         text = await _call(client, "get_profile", {})
         print(_truncate(text, 400))
         s, n = _classify(text)
@@ -113,7 +115,7 @@ async def main() -> int:
 
         # 2. get_moments_calendar (30-day window)
         print("\n" + "=" * 80)
-        print(f"\n[2/12] get_moments_calendar(start_date={thirty_days_ago}, end_date={today})")
+        print(f"\n[2/14] get_moments_calendar(start_date={thirty_days_ago}, end_date={today})")
         cal_text = await _call(client, "get_moments_calendar", {
             "start_date": thirty_days_ago, "end_date": today,
         })
@@ -124,7 +126,7 @@ async def main() -> int:
 
         # 3. get_recent_activity (default 7 days)
         print("\n" + "=" * 80)
-        print("\n[3/12] get_recent_activity()")
+        print("\n[3/14] get_recent_activity()")
         text = await _call(client, "get_recent_activity", {})
         print(_truncate(text, 600))
         s, n = _classify(text)
@@ -133,7 +135,7 @@ async def main() -> int:
 
         # 4. get_todays_moments
         print("\n" + "=" * 80)
-        print("\n[4/12] get_todays_moments()")
+        print("\n[4/14] get_todays_moments()")
         text = await _call(client, "get_todays_moments", {})
         print(_truncate(text, 400))
         s, n = _classify(text)
@@ -142,7 +144,7 @@ async def main() -> int:
 
         # 5. get_moments_by_date (today)
         print("\n" + "=" * 80)
-        print(f"\n[5/12] get_moments_by_date(date={today})")
+        print(f"\n[5/14] get_moments_by_date(date={today})")
         by_date_text = await _call(client, "get_moments_by_date", {"date": today})
         print(_truncate(by_date_text, 600))
         s, n = _classify(by_date_text)
@@ -151,7 +153,7 @@ async def main() -> int:
 
         # 6. search_moments (broad query)
         print("\n" + "=" * 80)
-        print("\n[6/12] search_moments(query='morning')")
+        print("\n[6/14] search_moments(query='morning')")
         search_text = await _call(client, "search_moments", {"query": "morning"})
         print(_truncate(search_text, 800))
         s, n = _classify(search_text)
@@ -172,7 +174,7 @@ async def main() -> int:
         # 7. get_moment_details
         print("\n" + "=" * 80)
         if moment_id:
-            print(f"\n[7/12] get_moment_details(moment_id={moment_id})")
+            print(f"\n[7/14] get_moment_details(moment_id={moment_id})")
             text = await _call(client, "get_moment_details", {"moment_id": moment_id})
             print(_truncate(text, 600))
             s, n = _classify(text)
@@ -185,7 +187,7 @@ async def main() -> int:
         # 8. get_moment_files
         print("\n" + "=" * 80)
         if moment_id:
-            print(f"\n[8/12] get_moment_files(moment_id={moment_id}, limit=5)")
+            print(f"\n[8/14] get_moment_files(moment_id={moment_id}, limit=5)")
             text = await _call(client, "get_moment_files", {"moment_id": moment_id, "limit": 5})
             print(_truncate(text, 600))
             s, n = _classify(text)
@@ -198,7 +200,7 @@ async def main() -> int:
         # 9. get_moment_with_media
         print("\n" + "=" * 80)
         if moment_id:
-            print(f"\n[9/12] get_moment_with_media(moment_id={moment_id}, media_limit=3)")
+            print(f"\n[9/14] get_moment_with_media(moment_id={moment_id}, media_limit=3)")
             text = await _call(
                 client, "get_moment_with_media",
                 {"moment_id": moment_id, "media_limit": 3},
@@ -213,7 +215,7 @@ async def main() -> int:
 
         # 10. get_highlights
         print("\n" + "=" * 80)
-        print("\n[10/12] get_highlights(limit=5)")
+        print("\n[10/14] get_highlights(limit=5)")
         text = await _call(client, "get_highlights", {"limit": 5})
         print(_truncate(text, 600))
         s, n = _classify(text)
@@ -222,7 +224,7 @@ async def main() -> int:
 
         # 11. get_realtime_event
         print("\n" + "=" * 80)
-        print("\n[11/12] get_realtime_event()")
+        print("\n[11/14] get_realtime_event()")
         text = await _call(client, "get_realtime_event", {})
         print(_truncate(text, 400))
         s, n = _classify(text)
@@ -233,9 +235,21 @@ async def main() -> int:
         print(f"  → {s}: {n}")
         results.append(("get_realtime_event", s, n))
 
-        # 12. search_moments_with_details
+        # 12. describe_realtime_event (extra visual via optional Forge)
         print("\n" + "=" * 80)
-        print("\n[12/12] search_moments_with_details(query='walk', max_results=2)")
+        print("\n[12/14] describe_realtime_event()")
+        text = await _call(client, "describe_realtime_event", {})
+        print(_truncate(text, 400))
+        s, n = _classify(text)
+        if s == FAIL and ("proactive" in text.lower() or "forge" in text.lower() or "image" in text.lower()):
+            s = SKIP
+            n = "expected: requires Proactive Mode or Forge VLM config"
+        print(f"  → {s}: {n}")
+        results.append(("describe_realtime_event", s, n))
+
+        # 13. search_moments_with_details
+        print("\n" + "=" * 80)
+        print("\n[13/14] search_moments_with_details(query='walk', max_results=2)")
         text = await _call(client, "search_moments_with_details", {
             "query": "walk", "max_results": 2,
         })
@@ -243,6 +257,23 @@ async def main() -> int:
         s, n = _classify(text)
         print(f"  → {s}: {n}")
         results.append(("search_moments_with_details", s, n))
+
+        # 14. extract_video_frames (needs a moment with video; graceful if none)
+        print("\n" + "=" * 80)
+        if moment_id:
+            print(f"\n[14/14] extract_video_frames(moment_id={moment_id}, max_frames=2)")
+            text = await _call(client, "extract_video_frames", {"moment_id": moment_id, "max_frames": 2})
+            print(_truncate(text, 600))
+            s, n = _classify(text)
+            # If no video in that moment, the tool returns structured JSON with reason (not Error:)
+            if s == PASS and "no_video" in text:
+                s = SKIP
+                n = "endpoint OK, chosen moment had no video file"
+        else:
+            print("\n[14/14] extract_video_frames — skipped (no moment_id to test)")
+            s, n = SKIP, "no moment_id available"
+        print(f"  → {s}: {n}")
+        results.append(("extract_video_frames", s, n))
 
     # Summary
     print("\n" + "=" * 80)
