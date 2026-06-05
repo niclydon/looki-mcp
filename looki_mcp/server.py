@@ -58,7 +58,7 @@ mcp = FastMCP(
         "Use get_moments_calendar or get_recent_activity for activity overview. "
         "Use get_todays_moments for what happened today. "
         "Use get_highlights for AI-generated content (comics, vlogs). "
-        "Use get_realtime_event to check what the user is doing right now (requires Proactive Mode)."
+        "Use get_realtime_event or describe_realtime_event to check what the user is doing right now (requires Proactive Mode; describe adds optional Forge VLM snapshot caption when available)."
     ),
 )
 
