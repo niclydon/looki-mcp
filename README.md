@@ -158,7 +158,27 @@ container; the compose file and Dockerfile assume this.
 
 `extract_video_frames` shells out to `ffmpeg` to sample stills from a Looki
 video file. If `ffmpeg` is unavailable, the base server still runs and that
-tool returns a clear error instead of crashing startup.
+tool returns a clear error instead of crashing startup. The binary path can be
+overridden with `FFMPEG_BIN` (see Environment Variables table and `.env.example`).
+
+### Optional Realtime / Forge Extras
+
+The `describe_realtime_event` tool (see Available Tools) can optionally augment
+the raw realtime payload with a one-sentence visual description of a device
+snapshot by calling a Forge VLM instance.
+
+- Set `FORGE_URL` (and optionally `FORGE_API_KEY` and `FORGE_VLM_MODEL`) to
+  enable this. The call is best-effort; failures are swallowed so the tool
+  still returns the raw event.
+- `LANGFUSE_*` vars (when `LANGFUSE_ENABLED=true`) will trace the VLM call
+  using the Langfuse Python SDK (trace/generation names prefixed
+  `looki-mcp.realtime.describe`). This is the same observability stack used
+  elsewhere; useful for cost/quality analysis of the descriptions.
+- These are advanced/optional — most users only need the core Looki creds.
+  Requires a separate Forge deployment (see your Forge docs) that supports
+  the vision model you choose.
+
+See `.env.example` for the exact variable names and example values.
 
 ### TLS / HTTPS
 
