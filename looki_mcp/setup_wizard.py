@@ -94,6 +94,7 @@ def _write_env(values: dict[str, str]) -> None:
         ("LOOKI_BASE_URL", "Your Looki API base URL — https://web.looki.ai/api-keys"),
         ("LOOKI_API_KEY", "Your Looki API key (starts with lk-)"),
         ("LOOKI_PORT", "HTTP port for this server"),
+        ("LOOKI_BIND_HOST", "Bind host (0.0.0.0 for all/Docker; 127.0.0.1 for same-host proxy)"),
         ("LOOKI_USER_TIMEZONE", "IANA timezone name (e.g. America/New_York). Empty = UTC."),
         ("LOOKI_MCP_BASE_URL", "Public URL of this server, used for icon display"),
         ("ORIGIN_SHARED_SECRET", "Shared secret required in the x-origin-secret header"),
@@ -174,6 +175,10 @@ async def main() -> int:
     print("-" * 60)
 
     port = _prompt("HTTP port for this server", default=existing.get("LOOKI_PORT", "3456"))
+    bind_host = _prompt(
+        "Bind host (0.0.0.0 = all interfaces / Docker; 127.0.0.1 = localhost-only for proxy)",
+        default=existing.get("LOOKI_BIND_HOST", "0.0.0.0"),
+    )
     timezone = _prompt(
         "Your timezone (IANA name, e.g. America/New_York; blank = UTC)",
         default=existing.get("LOOKI_USER_TIMEZONE", ""),
@@ -212,6 +217,7 @@ async def main() -> int:
         "LOOKI_BASE_URL": base_url,
         "LOOKI_API_KEY": api_key,
         "LOOKI_PORT": port,
+        "LOOKI_BIND_HOST": bind_host,
         "LOOKI_USER_TIMEZONE": timezone,
         "LOOKI_MCP_BASE_URL": public_url,
         "ORIGIN_SHARED_SECRET": origin_secret,

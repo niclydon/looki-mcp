@@ -76,6 +76,7 @@ Edit `.env`:
 LOOKI_BASE_URL=https://your-looki-base-url
 LOOKI_API_KEY=lk-your-api-key-here
 LOOKI_PORT=3456
+LOOKI_BIND_HOST=0.0.0.0
 LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com   # optional, enables icon display
 ORIGIN_SHARED_SECRET=                                  # optional, request-level auth
 ```
@@ -87,6 +88,7 @@ ORIGIN_SHARED_SECRET=                                  # optional, request-level
 | `LOOKI_BASE_URL` | yes | Your Looki API base URL — generate at [web.looki.ai/api-keys](https://web.looki.ai/api-keys) |
 | `LOOKI_API_KEY` | yes | API key starting with `lk-` |
 | `LOOKI_PORT` | no | HTTP port for the server (default: `3456`) |
+| `LOOKI_BIND_HOST` | no | Bind address for uvicorn (default: `0.0.0.0`). Set `127.0.0.1` for same-host reverse-proxy setups (Cloudflare Tunnel, Caddy, nginx on the box) so the raw server isn't on the network. Docker users must use `0.0.0.0` (default) or published ports won't reach the process. |
 | `LOOKI_MCP_BASE_URL` | no | Public URL of this server, used for icon display in MCP clients |
 | `LOOKI_USER_TIMEZONE` | no | IANA timezone name (e.g. `America/New_York`) for "today"/"recent" date calculations. Defaults to UTC when unset. See [Timezone Handling](#timezone-handling) below. |
 | `LOOKI_TLS_CERT_PATH` | no | Path to TLS certificate file (PEM). When set together with `LOOKI_TLS_KEY_PATH`, the server serves HTTPS directly. See [TLS / HTTPS](#tls--https) below. |
@@ -139,6 +141,18 @@ MCP clients can fetch the icon during pre-session metadata exchange).
 
 The startup banner reports `Origin-secret guard ENABLED` or `DISABLED` so
 you can see which mode is active in your logs.
+
+### Bind Host (LOOKI_BIND_HOST)
+The server binds to `LOOKI_BIND_HOST` (default `0.0.0.0`). 
+
+- Leave default for Docker, direct exposure, or when a proxy is on a different host.
+- Set to `127.0.0.1` for "localhost only" when the reverse proxy (Caddy, Cloudflare
+  Tunnel, nginx) runs on the *same machine* — the proxy reaches the MCP via loopback
+  while nothing on the LAN can hit the raw port directly.
+- The startup log now prints the actual bound address (no more hard-coded 0.0.0.0 lie).
+
+Docker healthchecks and published ports require the default `0.0.0.0` inside the
+container; the compose file and Dockerfile assume this.
 
 ### Optional Video Extras
 
@@ -241,7 +255,7 @@ Expected startup output:
 ```
 looki-mcp: Verifying Looki base URL...
 looki-mcp: Base URL verified OK.
-[looki-mcp] Server running on http://0.0.0.0:3456/mcp (13 tools)
+[looki-mcp] Server running on http://0.0.0.0:3456/mcp (14 tools)
 ```
 
 The server validates your credentials before accepting connections — if anything is
