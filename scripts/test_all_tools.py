@@ -3,9 +3,10 @@
 Server must be running on http://localhost:3456/mcp (default) with valid credentials.
 
 For each tool, prints a header, the call result (truncated), and PASS/FAIL.
-Tools that need a moment_id chain off the result of search_moments / calendar.
-Covers all 14 tools (dynamic count from server + explicit calls for the two
-post-1.0 additions: describe_realtime_event + extract_video_frames).
+Tools that need a moment_id / journal_id chain off the result of search_moments,
+calendar, or the journals feed.
+Covers all 24 tools (dynamic count from server + explicit calls including the
+journals family and the MinIO media-capture tools).
 
 Run: .venv/bin/python scripts/test_all_tools.py
 """
@@ -106,7 +107,7 @@ async def main() -> int:
         print("=" * 80)
 
         # 1. get_profile
-        print("\n[1/14] get_profile()")
+        print("\n[1/24] get_profile()")
         text = await _call(client, "get_profile", {})
         print(_truncate(text, 400))
         s, n = _classify(text)
@@ -115,7 +116,7 @@ async def main() -> int:
 
         # 2. get_moments_calendar (30-day window)
         print("\n" + "=" * 80)
-        print(f"\n[2/14] get_moments_calendar(start_date={thirty_days_ago}, end_date={today})")
+        print(f"\n[2/24] get_moments_calendar(start_date={thirty_days_ago}, end_date={today})")
         cal_text = await _call(client, "get_moments_calendar", {
             "start_date": thirty_days_ago, "end_date": today,
         })
@@ -126,7 +127,7 @@ async def main() -> int:
 
         # 3. get_recent_activity (default 7 days)
         print("\n" + "=" * 80)
-        print("\n[3/14] get_recent_activity()")
+        print("\n[3/24] get_recent_activity()")
         text = await _call(client, "get_recent_activity", {})
         print(_truncate(text, 600))
         s, n = _classify(text)
@@ -135,7 +136,7 @@ async def main() -> int:
 
         # 4. get_todays_moments
         print("\n" + "=" * 80)
-        print("\n[4/14] get_todays_moments()")
+        print("\n[4/24] get_todays_moments()")
         text = await _call(client, "get_todays_moments", {})
         print(_truncate(text, 400))
         s, n = _classify(text)
@@ -144,7 +145,7 @@ async def main() -> int:
 
         # 5. get_moments_by_date (today)
         print("\n" + "=" * 80)
-        print(f"\n[5/14] get_moments_by_date(date={today})")
+        print(f"\n[5/24] get_moments_by_date(date={today})")
         by_date_text = await _call(client, "get_moments_by_date", {"date": today})
         print(_truncate(by_date_text, 600))
         s, n = _classify(by_date_text)
@@ -153,7 +154,7 @@ async def main() -> int:
 
         # 6. search_moments (broad query)
         print("\n" + "=" * 80)
-        print("\n[6/14] search_moments(query='morning')")
+        print("\n[6/24] search_moments(query='morning')")
         search_text = await _call(client, "search_moments", {"query": "morning"})
         print(_truncate(search_text, 800))
         s, n = _classify(search_text)
@@ -174,12 +175,12 @@ async def main() -> int:
         # 7. get_moment_details
         print("\n" + "=" * 80)
         if moment_id:
-            print(f"\n[7/14] get_moment_details(moment_id={moment_id})")
+            print(f"\n[7/24] get_moment_details(moment_id={moment_id})")
             text = await _call(client, "get_moment_details", {"moment_id": moment_id})
             print(_truncate(text, 600))
             s, n = _classify(text)
         else:
-            print("\n[7/12] get_moment_details — skipped (no moment_id)")
+            print("\n[7/24] get_moment_details — skipped (no moment_id)")
             s, n = SKIP, "no moment_id available"
         print(f"  → {s}: {n}")
         results.append(("get_moment_details", s, n))
@@ -187,12 +188,12 @@ async def main() -> int:
         # 8. get_moment_files
         print("\n" + "=" * 80)
         if moment_id:
-            print(f"\n[8/14] get_moment_files(moment_id={moment_id}, limit=5)")
+            print(f"\n[8/24] get_moment_files(moment_id={moment_id}, limit=5)")
             text = await _call(client, "get_moment_files", {"moment_id": moment_id, "limit": 5})
             print(_truncate(text, 600))
             s, n = _classify(text)
         else:
-            print("\n[8/12] get_moment_files — skipped (no moment_id)")
+            print("\n[8/24] get_moment_files — skipped (no moment_id)")
             s, n = SKIP, "no moment_id available"
         print(f"  → {s}: {n}")
         results.append(("get_moment_files", s, n))
@@ -200,7 +201,7 @@ async def main() -> int:
         # 9. get_moment_with_media
         print("\n" + "=" * 80)
         if moment_id:
-            print(f"\n[9/14] get_moment_with_media(moment_id={moment_id}, media_limit=3)")
+            print(f"\n[9/24] get_moment_with_media(moment_id={moment_id}, media_limit=3)")
             text = await _call(
                 client, "get_moment_with_media",
                 {"moment_id": moment_id, "media_limit": 3},
@@ -208,14 +209,14 @@ async def main() -> int:
             print(_truncate(text, 800))
             s, n = _classify(text)
         else:
-            print("\n[9/12] get_moment_with_media — skipped (no moment_id)")
+            print("\n[9/24] get_moment_with_media — skipped (no moment_id)")
             s, n = SKIP, "no moment_id available"
         print(f"  → {s}: {n}")
         results.append(("get_moment_with_media", s, n))
 
         # 10. get_highlights
         print("\n" + "=" * 80)
-        print("\n[10/14] get_highlights(limit=5)")
+        print("\n[10/24] get_highlights(limit=5)")
         text = await _call(client, "get_highlights", {"limit": 5})
         print(_truncate(text, 600))
         s, n = _classify(text)
@@ -224,7 +225,7 @@ async def main() -> int:
 
         # 11. get_realtime_event
         print("\n" + "=" * 80)
-        print("\n[11/14] get_realtime_event()")
+        print("\n[11/24] get_realtime_event()")
         text = await _call(client, "get_realtime_event", {})
         print(_truncate(text, 400))
         s, n = _classify(text)
@@ -237,7 +238,7 @@ async def main() -> int:
 
         # 12. describe_realtime_event (extra visual via optional Forge)
         print("\n" + "=" * 80)
-        print("\n[12/14] describe_realtime_event()")
+        print("\n[12/24] describe_realtime_event()")
         text = await _call(client, "describe_realtime_event", {})
         print(_truncate(text, 400))
         s, n = _classify(text)
@@ -249,7 +250,7 @@ async def main() -> int:
 
         # 13. search_moments_with_details
         print("\n" + "=" * 80)
-        print("\n[13/14] search_moments_with_details(query='walk', max_results=2)")
+        print("\n[13/24] search_moments_with_details(query='walk', max_results=2)")
         text = await _call(client, "search_moments_with_details", {
             "query": "walk", "max_results": 2,
         })
@@ -261,7 +262,7 @@ async def main() -> int:
         # 14. extract_video_frames (needs a moment with video; graceful if none)
         print("\n" + "=" * 80)
         if moment_id:
-            print(f"\n[14/14] extract_video_frames(moment_id={moment_id}, max_frames=2)")
+            print(f"\n[14/24] extract_video_frames(moment_id={moment_id}, max_frames=2)")
             text = await _call(client, "extract_video_frames", {"moment_id": moment_id, "max_frames": 2})
             print(_truncate(text, 600))
             s, n = _classify(text)
@@ -270,10 +271,124 @@ async def main() -> int:
                 s = SKIP
                 n = "endpoint OK, chosen moment had no video file"
         else:
-            print("\n[14/14] extract_video_frames — skipped (no moment_id to test)")
+            print("\n[14/24] extract_video_frames — skipped (no moment_id to test)")
             s, n = SKIP, "no moment_id available"
         print(f"  → {s}: {n}")
         results.append(("extract_video_frames", s, n))
+
+        # --- journals family (8 tools) ---
+
+        # 15. get_journals_calendar (30-day window)
+        print("\n" + "=" * 80)
+        print(f"\n[15/24] get_journals_calendar(start_date={thirty_days_ago}, end_date={today})")
+        text = await _call(client, "get_journals_calendar", {
+            "start_date": thirty_days_ago, "end_date": today,
+        })
+        print(_truncate(text, 400))
+        s, n = _classify(text)
+        print(f"  → {s}: {n}")
+        results.append(("get_journals_calendar", s, n))
+
+        # 16. get_journals (summary feed) — also our source for a journal_id
+        print("\n" + "=" * 80)
+        print("\n[16/24] get_journals(max_days=7, mode='summary')")
+        journals_text = await _call(client, "get_journals", {"max_days": 7, "mode": "summary"})
+        print(_truncate(journals_text, 800))
+        s, n = _classify(journals_text)
+        print(f"  → {s}: {n}")
+        results.append(("get_journals", s, n))
+
+        journal_id = _extract_first_moment_id(journals_text)
+        if journal_id:
+            print(f"\n  (Using journal_id={journal_id} for get_journal_entry)")
+        else:
+            print("\n  (No journal_id available — get_journal_entry will be skipped)")
+
+        # 17. get_journals_by_date (today)
+        print("\n" + "=" * 80)
+        print(f"\n[17/24] get_journals_by_date(date={today})")
+        text = await _call(client, "get_journals_by_date", {"date": today})
+        print(_truncate(text, 600))
+        s, n = _classify(text)
+        print(f"  → {s}: {n}")
+        results.append(("get_journals_by_date", s, n))
+
+        # 18. get_journal_entry
+        print("\n" + "=" * 80)
+        if journal_id:
+            print(f"\n[18/24] get_journal_entry(journal_id={journal_id})")
+            text = await _call(client, "get_journal_entry", {"journal_id": journal_id})
+            print(_truncate(text, 600))
+            s, n = _classify(text)
+        else:
+            print("\n[18/24] get_journal_entry — skipped (no journal_id)")
+            s, n = SKIP, "no journal_id available"
+        print(f"  → {s}: {n}")
+        results.append(("get_journal_entry", s, n))
+
+        # 19. get_recent_journals
+        print("\n" + "=" * 80)
+        print("\n[19/24] get_recent_journals()")
+        text = await _call(client, "get_recent_journals", {})
+        print(_truncate(text, 600))
+        s, n = _classify(text)
+        print(f"  → {s}: {n}")
+        results.append(("get_recent_journals", s, n))
+
+        # 20. get_todays_journal
+        print("\n" + "=" * 80)
+        print("\n[20/24] get_todays_journal()")
+        text = await _call(client, "get_todays_journal", {})
+        print(_truncate(text, 600))
+        s, n = _classify(text)
+        print(f"  → {s}: {n}")
+        results.append(("get_todays_journal", s, n))
+
+        # 21. backfill_journals (bounded)
+        print("\n" + "=" * 80)
+        print("\n[21/24] backfill_journals(max_total_days=10, max_pages=2)")
+        text = await _call(client, "backfill_journals", {"max_total_days": 10, "max_pages": 2})
+        print(_truncate(text, 600))
+        s, n = _classify(text)
+        print(f"  → {s}: {n}")
+        results.append(("backfill_journals", s, n))
+
+        # 22. search_journals
+        print("\n" + "=" * 80)
+        print("\n[22/24] search_journals(query='walk')")
+        text = await _call(client, "search_journals", {"query": "walk"})
+        print(_truncate(text, 800))
+        s, n = _classify(text)
+        print(f"  → {s}: {n}")
+        results.append(("search_journals", s, n))
+
+        # --- media capture (MinIO) ---
+
+        # 23. capture_journal_media (graceful 'disabled' if MinIO unconfigured)
+        print("\n" + "=" * 80)
+        if journal_id:
+            print(f"\n[23/24] capture_journal_media(journal_id={journal_id})")
+            text = await _call(client, "capture_journal_media", {"journal_id": journal_id})
+            print(_truncate(text, 500))
+            s, n = _classify(text)
+            if s == PASS and '"status": "disabled"' in text:
+                s, n = SKIP, "MinIO not configured"
+        else:
+            print("\n[23/24] capture_journal_media — skipped (no journal_id)")
+            s, n = SKIP, "no journal_id available"
+        print(f"  → {s}: {n}")
+        results.append(("capture_journal_media", s, n))
+
+        # 24. backfill_journal_media (bounded)
+        print("\n" + "=" * 80)
+        print("\n[24/24] backfill_journal_media(max_total_days=2, max_pages=1)")
+        text = await _call(client, "backfill_journal_media", {"max_total_days": 2, "max_pages": 1})
+        print(_truncate(text, 500))
+        s, n = _classify(text)
+        if s == PASS and '"status": "disabled"' in text:
+            s, n = SKIP, "MinIO not configured"
+        print(f"  → {s}: {n}")
+        results.append(("backfill_journal_media", s, n))
 
     # Summary
     print("\n" + "=" * 80)

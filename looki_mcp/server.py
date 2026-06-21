@@ -12,12 +12,13 @@ from starlette.responses import FileResponse, JSONResponse
 
 from looki_mcp.tools.convenience import register_convenience_tools
 from looki_mcp.tools.highlights import register_highlights_tools
+from looki_mcp.tools.journals import register_journals_tools
 from looki_mcp.tools.moments import register_moments_tools
 from looki_mcp.tools.profile import register_profile_tools
 from looki_mcp.tools.realtime import register_realtime_tools
 from looki_mcp.tools.video import register_video_tools
 
-TOOL_COUNT = 14
+TOOL_COUNT = 24
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 LOGO_PATH = ASSETS_DIR / "looki-logo.ico"
@@ -58,6 +59,11 @@ mcp = FastMCP(
         "Use get_moments_calendar or get_recent_activity for activity overview. "
         "Use get_todays_moments for what happened today. "
         "Use get_highlights for AI-generated content (comics, vlogs). "
+        "Use get_recent_journals, get_todays_journal, or search_journals for the user's written journal — "
+        "AI-generated diary recaps, dietary and meeting summaries, and storyboards; "
+        "get_journal_entry reads one entry in full and backfill_journals loads deep history. "
+        "Journal images are AI-generated and their URLs expire quickly; capture_journal_media and "
+        "backfill_journal_media save durable copies to object storage (get_journal_entry also captures on read). "
         "Use get_realtime_event or describe_realtime_event to check what the user is doing right now (requires Proactive Mode; describe adds optional Forge VLM snapshot caption when available)."
     ),
 )
@@ -65,6 +71,7 @@ mcp = FastMCP(
 register_profile_tools(mcp)
 register_moments_tools(mcp)
 register_highlights_tools(mcp)
+register_journals_tools(mcp)
 register_realtime_tools(mcp)
 register_video_tools(mcp)
 register_convenience_tools(mcp)

@@ -2,17 +2,19 @@
 
 An MCP (Model Context Protocol) server for the [Looki](https://web.looki.ai) wearable
 camera — giving Claude, ChatGPT, and other AI assistants access to your personal
-memories, moments, photos, and AI-generated highlights.
+memories, moments, photos, AI-generated highlights, and written journal entries.
 
 ## What It Does
 
 Looki L1 is a wearable camera that passively captures your daily life. This MCP server
-exposes your Looki data through 14 tools that AI assistants can use to answer questions like:
+exposes your Looki data through 24 tools that AI assistants can use to answer questions like:
 
 - "What did I do last Thursday?"
 - "Find the moment where I was at the coffee shop"
 - "Show me my recent highlights"
 - "What have I been up to this week?"
+- "Recap my week from my journal" / "What does my journal say about today?"
+- "Find the journal entry where I wrote about the hike"
 - "What am I doing right now?" *(requires Proactive Mode)*
 
 ## Prerequisites
@@ -275,7 +277,7 @@ Expected startup output:
 ```
 looki-mcp: Verifying Looki base URL...
 looki-mcp: Base URL verified OK.
-[looki-mcp] Server running on http://0.0.0.0:3456/mcp (14 tools)
+[looki-mcp] Server running on http://0.0.0.0:3456/mcp (24 tools)
 ```
 
 The server validates your credentials before accepting connections — if anything is
@@ -373,12 +375,34 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `get_moment_with_media` | Moment + media in one call | `moment_id`, `highlight_only` |
 | `search_moments_with_details` | Search + fetch details in one call | `query`, `max_results` |
 | `extract_video_frames` | Sample still frames from a moment's video file | `moment_id`, `max_frames` |
+| `get_journals` | Journal feed (diary recaps, dietary/meeting summaries, storyboards) grouped by day | `cursor_date`, `max_days`, `sort_order`, `mode` |
+| `get_journals_calendar` | Which days have journal entries (cheap probe) | `start_date`, `end_date` |
+| `get_journals_by_date` | All journal entries for one specific date | `date`, `mode` |
+| `get_journal_entry` | Full, untruncated single journal entry by ID | `journal_id` |
+| `get_recent_journals` | Journal entries from the last N days (user TZ) | `days`, `mode` |
+| `get_todays_journal` | Today's journal, daily recap first (user TZ) | `mode` |
+| `backfill_journals` | Walk journal history backwards (bounded date-cursor loop) | `cursor_date`, `max_total_days`, `mode`, `max_pages` |
+| `search_journals` | Substring search over recent journal text (client-side) | `query`, `days`, `max_results` |
+| `capture_journal_media` | Save one entry's AI images to durable MinIO storage | `journal_id`, `overwrite` |
+| `backfill_journal_media` | Sweep history and save all journal media to MinIO | `cursor_date`, `max_total_days`, `max_pages`, `overwrite` |
+
+Journal listing tools accept a `mode` knob — `index` (id/title spine), `summary`
+(truncated content, the default), or `full` (verbatim payload) — to keep token cost in
+check, since a day holds several long entries. Use `get_journal_entry` to read any one
+entry in full.
+
+**Journal media capture.** Journal images are AI-generated and their `temporary_url`s are
+short-lived (~10 min) JWTs. When MinIO is configured (see below), `capture_journal_media`
+and `backfill_journal_media` copy those images into durable object storage, and
+`get_journal_entry` captures on read. Capture is idempotent (already-stored media is
+skipped). Without MinIO configured, these tools return a `disabled` status and the rest of
+the server works unchanged.
 
 ## Health Endpoint
 
 ```
 GET /health
-{"status":"ok","server":"looki-mcp","version":"1.0.0","tools":14}
+{"status":"ok","server":"looki-mcp","version":"1.0.0","tools":24}
 ```
 
 Useful for Docker healthchecks, load balancers, and uptime monitoring.

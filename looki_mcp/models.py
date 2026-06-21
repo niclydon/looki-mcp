@@ -6,7 +6,8 @@ work with — they are NOT currently enforced as runtime validators. Tools call
 unmodified, so model drift never breaks tool behavior; it only affects how
 accurately the docs match reality.
 
-All shapes below have been verified against the live Looki API as of 2026-04-29.
+All shapes below have been verified against the live Looki API as of 2026-04-29
+(moments / highlights / profile / realtime) and 2026-06-20 (journals).
 The Looki API wraps every response in `{code, detail, data}`; our `unwrap()`
 helper strips that envelope, so the models below describe the *unwrapped* `data`
 field, not the raw HTTP body.
@@ -150,6 +151,78 @@ class RealtimeEventResponse(BaseModel):
     description: str | None = None
     timestamp: str | None = None
     detected_at: str | None = None
+
+
+class JournalMediaFile(BaseModel):
+    """The image (or other media) behind a journal media item. AI-generated; only
+    `IMAGE` observed in journals so far (VIDEO/AUDIO permitted but unseen)."""
+
+    temporary_url: str  # Presigned URL; short-lived JWT (~10 min observed, shorter than moments' ~1h)
+    media_type: str  # "IMAGE" per live API
+    size: int | None = None
+    duration_ms: int | None = None
+
+
+class JournalMediaItem(BaseModel):
+    """One media attachment on a journal entry. The `source.temporary_url` path
+    encodes provenance: /processed/{user_event_diary_image|dietary_image|
+    storyboard_image|meeting_analysis_cover_image|daily_routine_image}/..."""
+
+    source: JournalMediaFile
+    thumbnail: JournalMediaFile | None = None
+
+
+class JournalEntryModel(BaseModel):
+    """A single journal entry. Returned both embedded in JournalDayBucketModel.journals
+    and bare from GET /journals/{id}. Six observed `type` values, each with a different
+    text/media profile (see journals_api_findings.md):
+    YESTERDAY_RECAP (long recap, no title/media), DIETARY & AUDIO_SUMMARY (titled, long
+    content, 1 image), DIARY (short vignette, ~0.6 images), STORYBOARD & DAILY_ROUTINE
+    (titled, description-only, multi-day, 1 image)."""
+
+    id: str  # UUID — use with /journals/{id}
+    type: str  # YESTERDAY_RECAP | DIETARY | AUDIO_SUMMARY | DIARY | STORYBOARD | DAILY_ROUTINE
+    title: str | None = None  # null on DIARY / YESTERDAY_RECAP
+    description: str
+    content: str | None = None  # null on STORYBOARD / DAILY_ROUTINE
+    media_items: list[JournalMediaItem] = []
+    date: str  # YYYY-MM-DD
+    start_date: str | None = None  # range start for multi-day types
+    tz: str  # UTC offset, e.g. "-04:00"
+    recorded_at: str
+    created_at: str
+
+
+class JournalDayBucketModel(BaseModel):
+    """One day-grouping in the journals feed / by_date response. NOTE: a single
+    calendar date can yield MULTIPLE buckets (e.g. a multi-day STORYBOARD plus the
+    regular single-day bucket)."""
+
+    date: str
+    start_date: str | None = None  # set on buckets that hold a multi-day entry
+    journals: list[JournalEntryModel]
+
+
+class JournalCalendarDayModel(BaseModel):
+    """One day in the /journals/calendar response. The endpoint returns a bare list
+    of these (just dates that have entries) — there's no surrounding object."""
+
+    date: str
+
+
+class JournalsFeedResponse(BaseModel):
+    """GET /journals. `next_cursor_id` is a DATE string (not an opaque id) — pass it
+    back as the `cursor_date` query param to page into older history."""
+
+    items: list[JournalDayBucketModel]
+    next_cursor_id: str | None = None
+    has_more: bool | None = None
+
+
+# /journals            returns: JournalsFeedResponse  (params: cursor_date, max_days≤31, sort_order)
+# /journals/calendar   returns: list[JournalCalendarDayModel]  (params: start_date, end_date)
+# /journals/by_date    returns: list[JournalDayBucketModel]    (params: on_date)
+# /journals/{id}       returns: JournalEntryModel
 
 
 class VerifyResponse(BaseModel):
