@@ -205,3 +205,66 @@ and respond intelligently — e.g., suggesting the user wait a minute, or asking
 a different moment ID.
 
 API keys are never included in error strings, even on auth failures.
+
+---
+
+## Journals: 8 tools with a token-discipline `mode` knob
+
+**Decision:** Expose the `/journals` family as 8 tools (4 required raw mirrors +
+4 composites), with a shared `mode` of `index` / `summary` / `full`.
+
+**Coverage (required):** `get_journals` (feed + date cursor), `get_journals_calendar`,
+`get_journals_by_date`, and `get_journal_entry` mirror the four real endpoints 1:1, the
+same way the moments tools do. The feed is the only paginating route, and its query
+params are exactly `cursor_date` / `max_days` (≤31) / `sort_order` — the tool deliberately
+does **not** expose `limit` / `on_date` / `type` / `start_date`, which `/journals` silently
+ignores.
+
+**Composites (recommended):** `get_recent_journals` and `get_todays_journal` mirror
+`get_recent_activity` / `get_todays_moments` (timezone-aware via `LOOKI_USER_TIMEZONE`).
+`backfill_journals` encodes the bounded date-cursor walk so an agent never hand-rolls an
+unbounded loop against the 60 req/min limit. `search_journals` exists because there is
+**no server-side journal search** — it substring-matches a bounded recent window
+client-side, returning ids + snippets to drill into.
+
+**Why the `mode` knob:** a single day holds ~7 entries and the long-form types
+(YESTERDAY_RECAP, DIETARY, AUDIO_SUMMARY) run ~2–2.5k chars each, so a naive full-content
+pull is a token bomb. Listing tools default to `summary` (content truncated to 600 chars,
+URL-free media metadata); `index` is an id/title spine; `full` is the verbatim API
+payload. `get_journal_entry` is always full (the deliberate "pay for one entry" escape
+hatch), and `backfill_journals` defaults to `index`. Both media `temporary_url`s
+(`source` **and** `thumbnail`) are short-lived (~10 min) JWTs, so summary/index modes omit
+them entirely and surface only the provenance category + a `has_thumbnail` flag — the
+agent re-fetches the entry (or uses `full`) for a live URL when it actually needs the
+image. `backfill_journals` additionally forbids `full` (only `index`/`summary`): it is the
+highest-volume call, so verbatim deep-history dumps are intentionally not offered — read
+individual entries with `get_journal_entry`. See `journals_api_findings.md` for the full
+mapping. (Both constraints came out of an adversarial review of the original diff.)
+
+---
+
+## Journal media capture to MinIO
+
+**Decision:** Copy journal media into durable object storage (MinIO/S3) via two explicit
+tools (`capture_journal_media`, `backfill_journal_media`) plus auto-capture on
+`get_journal_entry` reads.
+
+**Why:** Journal media `temporary_url`s are short-lived (~10 min) JWTs — once they expire
+the AI-generated images are unrecoverable. Persisting copies is the only way to keep them.
+
+**Trigger model:** explicit tools for deliberate single-entry capture and bounded
+historical sweeps, plus auto-capture when `get_journal_entry` reads one entry (bounded to
+that entry, idempotent, failures swallowed so a read never breaks). Wide listing tools
+(`get_journals`/`by_date`) deliberately do **not** auto-download — they stay fast and
+instead surface a deterministic `minio_key` per media item (where the durable copy lives)
+so an agent can fetch from storage or trigger capture. Capture is idempotent: object keys
+are deterministic (`journals/<date>/<journal_id>/<idx>_<source|thumb><ext>`) and an
+existing object is skipped unless `overwrite=True`.
+
+**Implementation:** boto3 S3 client against the MinIO endpoint, mirroring the homelab's
+other capture jobs (date-partitioned keys, ASCII-safe object metadata). Configured via
+`MINIO_ENDPOINT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` read directly
+from the environment (the optional-feature pattern used by Forge/Langfuse) — when unset,
+the capture tools return a `disabled` status and nothing else changes. Blocking boto3
+calls are offloaded with `asyncio.to_thread` so they never stall the event loop. The
+default bucket is `looki-journal-media`.
