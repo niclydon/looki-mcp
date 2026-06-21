@@ -64,3 +64,50 @@ commit + redeploy the production 7861 service to expose the new tools in the
 connected Looki MCP. Optional: `/code-review ultra` before shipping.
 
 Full story: `docs/narrative/2026-06-21-journals-api-and-media-capture.md`
+
+## 2026-06-21 — Shipped to production (commit/merge/push + drifted-checkout deploy)
+
+Committed the journals work, merged to mainline, pushed, and redeployed the
+production systemd service (port 7861) to the 24-tool code. Two latent repo
+conditions made a routine ship a careful one.
+
+**Commit + merge + push.** Feature branch `feat/journals-api-and-media-capture`
+→ commit `87dfeb7` → `git merge --no-ff` into `main` → merge `45f963c`; local
+branch deleted. Pre-commit secret grep confirmed no JWT/API-key/MinIO values in
+tracked files (`.env` gitignored).
+
+**Branch-topology surprise.** The remote's default branch is `master`
+(`git ls-remote --symref origin HEAD`), but the local branch is named `main` and
+tracks `origin/master`. The first `git push origin HEAD` updated a stale
+`origin/main` and left the real default behind. Fixed with `git push origin
+main:master` (clean fast-forward `e608fbb..45f963c`); both `origin/main` and
+`origin/master` now at `45f963c`. Naming quirk left in place, flagged.
+
+**Drifted production checkout.** `/services/looki-mcp` was on `master` at
+`e051150` with a dirty tree (uncommitted edits to `server.py`, `realtime.py`,
+`main.py`, `README.md`, the systemd template; untracked `video.py`/`LICENSE`) —
+deployed by editing-in-place, behind the mainline. A `git pull` would have
+conflicted/clobbered. Reconciled safely: full backup
+(`/tmp/looki_prod_backup_predeploy.tar.gz`) + `.env` copy; `git stash -u`
+(`stash@{0}: prod-drift-pre-journals-deploy-e051150`, retained); confirmed the
+drift was superseded code, not prod-unique; `git merge --ff-only origin/master`
+→ `45f963c`. `.env` (gitignored) preserved untouched.
+
+**Config + deps + restart.** Appended `MINIO_*` (crucible, bucket
+`looki-journal-media`) to the prod `.env`, preserving the six existing
+`LOOKI_*`/`ORIGIN_*` keys; installed `boto3 1.43.34` into the prod venv;
+`sudo systemctl restart looki-mcp`.
+
+**Verified live.** `/health` → `tools:24`, `active`, `NRestarts 0`. Through the
+production MCP (origin-secret header required): 24 tools listed, `get_journals`
+returns data (22 entries with media), `capture_journal_media` not `disabled`
+(prod loaded `MINIO_*`), captures to `looki-journal-media`, 0 failures
+(`already_captured=1` — idempotent against the dev-test object). 13 objects in
+bucket.
+
+**Unblocked / pending.** The 24 tools (journals + durable media capture) are live
+in the connected Looki MCP. Pending hygiene: switch prod off edit-in-place
+deploys (pull commits, keep the deploy checkout clean); optionally tidy the
+`origin/main` vs `origin/master` default-branch split. Recorded in project memory.
+
+Full story: `docs/narrative/2026-06-21-shipping-and-the-drifted-checkout.md`
