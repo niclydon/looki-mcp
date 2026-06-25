@@ -12,13 +12,16 @@ from starlette.responses import FileResponse, JSONResponse
 
 from looki_mcp.tools.convenience import register_convenience_tools
 from looki_mcp.tools.highlights import register_highlights_tools
+from looki_mcp.tools.insight_memory import register_memory_tools
+from looki_mcp.tools.insight_places import register_places_tools
+from looki_mcp.tools.insight_productivity import register_productivity_tools
 from looki_mcp.tools.journals import register_journals_tools
 from looki_mcp.tools.moments import register_moments_tools
 from looki_mcp.tools.profile import register_profile_tools
 from looki_mcp.tools.realtime import register_realtime_tools
 from looki_mcp.tools.video import register_video_tools
 
-TOOL_COUNT = 24
+TOOL_COUNT = 27
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 LOGO_PATH = ASSETS_DIR / "looki-logo.ico"
@@ -65,6 +68,10 @@ mcp = FastMCP(
         "Journal images are AI-generated and their URLs expire quickly; capture_journal_media and "
         "backfill_journal_media save durable copies to object storage (get_journal_entry also captures on read). "
         "Use get_realtime_event or describe_realtime_event to check what the user is doing right now (requires Proactive Mode; describe adds optional Forge VLM snapshot caption when available)."
+        " Insight tools (commitment_harvester, the_unwritten, places_of_my_life) "
+        "combine multiple endpoints and return a {data, narrative, meta} envelope "
+        "(narrative is filled only when an LLM provider is configured); the other "
+        "tools return raw API JSON."
     ),
 )
 
@@ -75,6 +82,9 @@ register_journals_tools(mcp)
 register_realtime_tools(mcp)
 register_video_tools(mcp)
 register_convenience_tools(mcp)
+register_productivity_tools(mcp)
+register_memory_tools(mcp)
+register_places_tools(mcp)
 
 
 @mcp.custom_route("/health", methods=["GET"])
