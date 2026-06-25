@@ -38,7 +38,12 @@ def test_tool_envelope():
         return ([{"date": "2026-06-20", "moments": [_moment("a", "2026-06-20")]}], [],
                 {"calls_used": 2, "days_scanned": days, "capped": None})
     mem._gather_unwritten = fake_gather  # type: ignore
-    out = json.loads(asyncio.run(mem._the_unwritten_impl(days=7, min_significance=2)))
+    saved = mem.llm.llm_configured
+    mem.llm.llm_configured = lambda: False
+    try:
+        out = json.loads(asyncio.run(mem._the_unwritten_impl(days=7, min_significance=2)))
+    finally:
+        mem.llm.llm_configured = saved
     assert [m["id"] for m in out["data"]["unwritten"]] == ["a"]
     assert out["narrative"] is None and out["meta"]["calls_used"] == 2
 

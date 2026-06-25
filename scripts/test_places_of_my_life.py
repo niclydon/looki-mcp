@@ -26,7 +26,7 @@ def test_rank_by_visits_then_time():
     assert ("Cafe", 1) in names
     home = next(p for p in out["places"] if p["name"] == "Home")
     assert home["total_seconds"] == 1800 + 3600    # 30min + 60min
-    assert home["sample_moment"]["id"] in ("1", "2")
+    assert home["sample_moment"]["id"] == "1"
 
 def test_top_n_truncates():
     moments = [_m(str(i), "2026-06-01", f"place{i}", "08:00:00", "08:10:00") for i in range(5)]
@@ -38,7 +38,12 @@ def test_tool_envelope():
         return ([_m("1", "2026-06-01", "Home", "08:00:00", "08:30:00")],
                 {"calls_used": 1, "days_scanned": days, "capped": None})
     places._gather_place_moments = fake_gather  # type: ignore
-    out = json.loads(asyncio.run(places._places_of_my_life_impl(days=30, top_n=15, deep=False)))
+    saved = places.llm.llm_configured
+    places.llm.llm_configured = lambda: False
+    try:
+        out = json.loads(asyncio.run(places._places_of_my_life_impl(days=30, top_n=15, deep=False)))
+    finally:
+        places.llm.llm_configured = saved
     assert out["data"]["places"][0]["name"] == "Home"
     assert out["narrative"] is None and out["meta"]["days_scanned"] == 30
 

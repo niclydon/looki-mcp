@@ -29,7 +29,12 @@ def test_tool_wraps_in_envelope():
                   "content": "TODOs\n- ship it"}],
                 {"calls_used": 1, "days_scanned": days, "capped": None})
     prod._gather_journal_entries = fake_gather  # type: ignore
-    out = json.loads(asyncio.run(prod._commitment_harvester_impl(days=7)))
+    saved = prod.llm.llm_configured
+    prod.llm.llm_configured = lambda: False
+    try:
+        out = json.loads(asyncio.run(prod._commitment_harvester_impl(days=7)))
+    finally:
+        prod.llm.llm_configured = saved
     assert out["data"]["total"] == 1
     assert out["data"]["by_date"]["2026-06-20"][0]["text"] == "ship it"
     assert out["narrative"] is None              # no LLM configured
