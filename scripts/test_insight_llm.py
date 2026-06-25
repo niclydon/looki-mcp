@@ -72,6 +72,33 @@ async def test_openai_compat_describe():
     finally:
         _clear()
 
+def test_anthropic_synthesize():
+    try:
+        _clear()
+        os.environ.update({"LOOKI_LLM_PROVIDER":"anthropic","LOOKI_LLM_API_KEY":"sk","LOOKI_LLM_MODEL":"claude-haiku-4-5"})
+        seen = {}
+        async def fake_post(url, headers, payload, *, timeout=30.0):
+            seen["url"] = url; seen["hdr"] = headers
+            return {"content": [{"type": "text", "text": "hi"}]}
+        llm._http_post = fake_post  # type: ignore
+        out = asyncio.run(llm.synthesize("sys", "user"))
+        assert out == "hi"
+        assert "/v1/messages" in seen["url"] and seen["hdr"].get("x-api-key") == "sk"
+    finally:
+        _clear()
+
+def test_gemini_extract_json():
+    try:
+        _clear()
+        os.environ.update({"LOOKI_LLM_PROVIDER":"gemini","LOOKI_LLM_API_KEY":"sk","LOOKI_LLM_MODEL":"gemini-2.5-flash"})
+        async def fake_post(url, headers, payload, *, timeout=30.0):
+            return {"candidates": [{"content": {"parts": [{"text": "{\"k\": 1}"}]}}]}
+        llm._http_post = fake_post  # type: ignore
+        out = asyncio.run(llm.extract_json("sys", "user"))
+        assert out == {"k": 1}
+    finally:
+        _clear()
+
 def main():
     test_unconfigured_is_none_and_false()
     test_forge_backcompat()
@@ -79,6 +106,12 @@ def main():
     asyncio.run(test_calls_return_none_when_unconfigured())
     asyncio.run(test_openai_compat_describe())
     import importlib
+    importlib.reload(llm)
+    _clear()
+    test_anthropic_synthesize()
+    importlib.reload(llm)
+    _clear()
+    test_gemini_extract_json()
     importlib.reload(llm)
     _clear()
     print("\033[32mPASS\033[0m insight.llm config")

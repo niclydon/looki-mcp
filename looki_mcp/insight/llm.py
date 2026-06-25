@@ -67,19 +67,74 @@ async def _openai_chat(cfg: dict, messages: list, *, max_tokens: int, json_mode:
     return data.get("choices", [{}])[0].get("message", {}).get("content")
 
 
+def _anthropic_headers(cfg: dict) -> dict:
+    return {"content-type": "application/json", "x-api-key": cfg["api_key"], "anthropic-version": "2023-06-01"}
+
+
+async def _anthropic_messages(cfg: dict, system: str, content, *, max_tokens: int) -> str | None:
+    base = (cfg["base_url"] or "https://api.anthropic.com").rstrip("/")
+    payload = {"model": cfg["model"], "max_tokens": max_tokens, "system": system,
+               "messages": [{"role": "user", "content": content}]}
+    data = await _http_post(f"{base}/v1/messages", _anthropic_headers(cfg), payload)
+    parts = data.get("content", [])
+    return parts[0].get("text") if parts else None
+
+
+def _anthropic_image_source(url: str) -> dict:
+    # Expects a data: URL (base64). PR3's VLM tools download bytes first (spec M4).
+    if url.startswith("data:"):
+        header, b64 = url.split(",", 1)
+        media_type = header.split(";")[0].removeprefix("data:") or "image/jpeg"
+        return {"type": "base64", "media_type": media_type, "data": b64}
+    return {"type": "url", "url": url}
+
+
+def _gemini_image_part(url: str) -> dict:
+    if url.startswith("data:"):
+        header, b64 = url.split(",", 1)
+        return {"inline_data": {"mime_type": header.split(";")[0].removeprefix("data:"), "data": b64}}
+    return {"file_data": {"file_uri": url}}
+
+
+async def _gemini_generate(cfg: dict, system: str, parts: list, *, max_tokens: int, force_json: bool = False) -> str | None:
+    base = (cfg["base_url"] or "https://generativelanguage.googleapis.com").rstrip("/")
+    url = f"{base}/v1beta/models/{cfg['model']}:generateContent?key={cfg['api_key']}"
+    payload: dict = {"contents": [{"parts": parts}], "generationConfig": {"maxOutputTokens": max_tokens}}
+    if system:
+        payload["systemInstruction"] = {"parts": [{"text": system}]}
+    if force_json:
+        # Gemini's reliable structured-output knob is responseMimeType; its OpenAI-compat
+        # json_schema support is partial, so we ask for JSON and parse in extract_json.
+        payload["generationConfig"]["responseMimeType"] = "application/json"
+    data = await _http_post(url, {"content-type": "application/json"}, payload)
+    cands = data.get("candidates", [])
+    if not cands:
+        return None
+    gparts = cands[0].get("content", {}).get("parts", [])
+    return gparts[0].get("text") if gparts else None
+
+
 async def _provider_image(cfg: dict, prompt: str, image_url: str, max_tokens: int) -> str | None:
-    """Placeholder for Task 5 (anthropic, gemini providers)."""
-    raise NotImplementedError(f"Image description not yet implemented for provider '{cfg['provider']}'")
+    """Task 5: anthropic, gemini providers."""
+    if cfg["provider"] == "anthropic":
+        # Anthropic needs base64 image source, not a URL — caller passes a data: URL (Task 6/PR3).
+        content = [{"type": "text", "text": prompt}, {"type": "image", "source": _anthropic_image_source(image_url)}]
+        return await _anthropic_messages({**cfg, "model": cfg["vlm_model"]}, "", content, max_tokens=max_tokens)
+    return await _gemini_generate({**cfg, "model": cfg["vlm_model"]}, "", [{"text": prompt}, _gemini_image_part(image_url)], max_tokens=max_tokens)
 
 
 async def _provider_text(cfg: dict, system: str, user: str, max_tokens: int) -> str | None:
-    """Placeholder for Task 5 (anthropic, gemini providers)."""
-    raise NotImplementedError(f"Text synthesis not yet implemented for provider '{cfg['provider']}'")
+    """Task 5: anthropic, gemini providers."""
+    if cfg["provider"] == "anthropic":
+        return await _anthropic_messages(cfg, system, [{"type": "text", "text": user}], max_tokens=max_tokens)
+    return await _gemini_generate(cfg, system, [{"text": user}], max_tokens=max_tokens)
 
 
 async def _provider_json(cfg: dict, system: str, user: str, schema: dict | None) -> str | None:
-    """Placeholder for Task 5 (anthropic, gemini providers)."""
-    raise NotImplementedError(f"JSON extraction not yet implemented for provider '{cfg['provider']}'")
+    """Task 5: anthropic, gemini providers."""
+    if cfg["provider"] == "anthropic":
+        return await _anthropic_messages(cfg, system + " Respond with ONLY valid JSON.", [{"type": "text", "text": user}], max_tokens=900)
+    return await _gemini_generate(cfg, system, [{"text": user}], max_tokens=900, force_json=True)
 
 
 async def describe_image(image_url: str, prompt: str, *, max_tokens: int = 120) -> str | None:
