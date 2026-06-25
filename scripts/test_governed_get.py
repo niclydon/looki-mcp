@@ -13,7 +13,7 @@ async def _run(handler):
     async with httpx.AsyncClient(transport=transport, base_url="https://x") as c:
         return await client_mod.governed_get(c, "/moments", params={"on_date": "2026-06-01"})
 
-def test_retries_then_succeeds(monkeypatch_sleep):
+def test_retries_then_succeeds():
     calls = {"n": 0}
     def handler(request):
         calls["n"] += 1
@@ -23,14 +23,27 @@ def test_retries_then_succeeds(monkeypatch_sleep):
     resp = asyncio.run(_run(handler))
     assert resp.status_code == 200 and calls["n"] == 2
 
+def test_exhausted_retries_raises():
+    """Test that 429 on every call (max_retries=2) raises HTTPStatusError after 3 total attempts."""
+    calls = {"n": 0}
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(429, headers={"Retry-After": "1"}, json={"code": 429, "detail": "rate"})
+    try:
+        asyncio.run(_run(handler))
+        assert False, "Expected HTTPStatusError to be raised"
+    except httpx.HTTPStatusError as e:
+        assert e.response.status_code == 429
+        assert calls["n"] == 3, f"Expected 3 calls (max_retries + 1), got {calls['n']}"
+
 def main():
     # Patch BOTH sleeps (governor + backoff) to no-op for an instant test.
-    import looki_mcp.insight.governor as gov
     async def _nosleep(*a, **k): return None
     orig = asyncio.sleep
     asyncio.sleep = _nosleep  # type: ignore
     try:
-        test_retries_then_succeeds(None)
+        test_retries_then_succeeds()
+        test_exhausted_retries_raises()
     finally:
         asyncio.sleep = orig  # type: ignore
     print("\033[32mPASS\033[0m governed_get")
