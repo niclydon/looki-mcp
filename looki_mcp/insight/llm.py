@@ -181,4 +181,10 @@ async def extract_json(system: str, user: str, *, schema: dict | None = None) ->
 
 
 async def caption_images(image_urls: list[str], prompt: str, *, concurrency: int = 4) -> list[str | None]:
-    return [None for _ in image_urls]  # implemented in Task 6
+    if not llm_configured():
+        return [None for _ in image_urls]
+    sem = asyncio.Semaphore(max(1, concurrency))
+    async def _one(u: str) -> str | None:
+        async with sem:
+            return await describe_image(u, prompt)
+    return list(await asyncio.gather(*[_one(u) for u in image_urls]))

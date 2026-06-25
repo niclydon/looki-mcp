@@ -99,6 +99,25 @@ def test_gemini_extract_json():
     finally:
         _clear()
 
+def test_caption_images_order_and_isolation():
+    import importlib
+    try:
+        _clear()
+        for k in _KEYS: os.environ.pop(k, None)
+        os.environ.update({"LOOKI_LLM_PROVIDER":"openai_compatible","LOOKI_LLM_BASE_URL":"http://f","LOOKI_LLM_MODEL":"m"})
+        async def fake_post(url, headers, payload, *, timeout=30.0):
+            # echo back the image url tail; raise for the 'bad' one
+            img = payload["messages"][0]["content"][1]["image_url"]["url"]
+            if img.endswith("bad.jpg"):
+                raise RuntimeError("boom")
+            return {"choices": [{"message": {"content": img.split("/")[-1]}}]}
+        llm._http_post = fake_post  # type: ignore
+        out = asyncio.run(llm.caption_images(["http://x/a.jpg","http://x/bad.jpg","http://x/c.jpg"], "p"))
+        assert out == ["a.jpg", None, "c.jpg"], out
+    finally:
+        importlib.reload(llm)
+        _clear()
+
 def main():
     test_unconfigured_is_none_and_false()
     test_forge_backcompat()
@@ -114,6 +133,7 @@ def main():
     test_gemini_extract_json()
     importlib.reload(llm)
     _clear()
+    test_caption_images_order_and_isolation()
     print("\033[32mPASS\033[0m insight.llm config")
 
 if __name__ == "__main__":
