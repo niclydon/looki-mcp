@@ -37,12 +37,24 @@ def test_uses_description_when_no_content():
     out = extract_todo_section(entry)
     assert out["parsed_section"] is True and out["items"] == ["one", "two"], out
 
+def test_heading_skips_prose_preamble():
+    entry = {"content": "Action Items\n(see notes)\n- actually do this\n- and this\n\nNext"}
+    out = extract_todo_section(entry)
+    assert out["parsed_section"] is True, out
+    assert out["items"] == ["actually do this", "and this"], out
+
+def test_bold_markdown_heading():
+    out = extract_todo_section({"content": "**Action Items**\n- one\n- two"})
+    assert out["parsed_section"] is True and out["items"] == ["one", "two"], out
+
 def main():
     test_heading_with_bullets()
     test_heading_variant_casing_and_punct()
     test_fallback_no_heading_scans_body()
     test_empty_is_safe()
     test_uses_description_when_no_content()
+    test_heading_skips_prose_preamble()
+    test_bold_markdown_heading()
     print("\033[32mPASS\033[0m journal_mine")
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ _TODO_PREFIX_RE = re.compile(r"^\s*TODO\s*:?\s*(.*\S)\s*$", re.IGNORECASE)
 def _clean_heading(line: str) -> str:
     """Lowercased heading text with markdown/punctuation stripped, for matching."""
     s = line.strip().lstrip("#*->").strip()
-    s = s.rstrip(":).").strip()
+    s = s.rstrip(":).*_ ").strip()
     return s.lower()
 
 
@@ -56,6 +56,7 @@ def extract_todo_section(entry: dict) -> dict:
                     items.append(item)
                 elif items:
                     break  # hit prose/next section after collecting items
+                # else: non-item line before any item—skip prose preamble under the heading
             if items:
                 return {"items": items, "parsed_section": True, "candidate_lines": len(items)}
 
