@@ -292,3 +292,4 @@ briefing is preferred.)*
 3. **PR3 — Deep + vision:** `life_rhythm` → `what_was_different`, `on_this_day_rewind`,
    `auto_biography_chapter`, `year_in_review`, `people_and_meetings_intel`, `visual_search`
    (match + ocr). Docs + privacy + live smoke + narrative.
+   - **PR3 prerequisite (from PR1 final review):** route `insight/llm.py`'s VLM/LLM HTTP calls through `insight/governor.py` before `caption_images`/`visual_search` are consumed, so combined Looki + VLM throughput respects the 60 req/min window.

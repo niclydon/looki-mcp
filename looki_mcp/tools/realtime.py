@@ -72,6 +72,7 @@ def register_realtime_tools(mcp: FastMCP) -> None:
     async def describe_realtime_event() -> str:
         """
         Returns the latest realtime event plus an optional one-sentence visual
-        description when a snapshot is available and Forge is configured.
+        description when a snapshot is available and a VLM provider is configured
+        (set `LOOKI_LLM_PROVIDER`, or `FORGE_*` for back-compat).
         """
         return await _describe_realtime_event_impl()
