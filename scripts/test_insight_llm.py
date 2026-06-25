@@ -91,11 +91,16 @@ def test_gemini_extract_json():
     try:
         _clear()
         os.environ.update({"LOOKI_LLM_PROVIDER":"gemini","LOOKI_LLM_API_KEY":"sk","LOOKI_LLM_MODEL":"gemini-2.5-flash"})
+        seen = {}
         async def fake_post(url, headers, payload, *, timeout=30.0):
+            seen["url"] = url; seen["headers"] = headers
             return {"candidates": [{"content": {"parts": [{"text": "{\"k\": 1}"}]}}]}
         llm._http_post = fake_post  # type: ignore
         out = asyncio.run(llm.extract_json("sys", "user"))
-        assert out == {"k": 1}
+        assert out == {"k": 1}, f"Expected {{'k': 1}}, got {out}"
+        assert ":generateContent" in seen["url"], f"URL missing :generateContent: {seen['url']}"
+        assert "key=" not in seen["url"], f"API key found in URL (should be in header): {seen['url']}"
+        assert seen["headers"].get("x-goog-api-key") == "sk", f"x-goog-api-key header missing or incorrect: {seen['headers']}"
     finally:
         _clear()
 

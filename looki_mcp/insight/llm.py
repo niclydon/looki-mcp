@@ -98,7 +98,8 @@ def _gemini_image_part(url: str) -> dict:
 
 async def _gemini_generate(cfg: dict, system: str, parts: list, *, max_tokens: int, force_json: bool = False) -> str | None:
     base = (cfg["base_url"] or "https://generativelanguage.googleapis.com").rstrip("/")
-    url = f"{base}/v1beta/models/{cfg['model']}:generateContent?key={cfg['api_key']}"
+    url = f"{base}/v1beta/models/{cfg['model']}:generateContent"
+    headers = {"content-type": "application/json", "x-goog-api-key": cfg["api_key"]}
     payload: dict = {"contents": [{"parts": parts}], "generationConfig": {"maxOutputTokens": max_tokens}}
     if system:
         payload["systemInstruction"] = {"parts": [{"text": system}]}
@@ -106,7 +107,7 @@ async def _gemini_generate(cfg: dict, system: str, parts: list, *, max_tokens: i
         # Gemini's reliable structured-output knob is responseMimeType; its OpenAI-compat
         # json_schema support is partial, so we ask for JSON and parse in extract_json.
         payload["generationConfig"]["responseMimeType"] = "application/json"
-    data = await _http_post(url, {"content-type": "application/json"}, payload)
+    data = await _http_post(url, headers, payload)
     cands = data.get("candidates", [])
     if not cands:
         return None
