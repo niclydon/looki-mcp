@@ -53,11 +53,33 @@ async def test_calls_return_none_when_unconfigured():
     finally:
         _clear()
 
+async def test_openai_compat_describe():
+    try:
+        _clear()
+        os.environ.update({"LOOKI_LLM_PROVIDER":"openai_compatible","LOOKI_LLM_BASE_URL":"http://forge.local","LOOKI_LLM_MODEL":"m","LOOKI_LLM_API_KEY":"sk"})
+        seen = {}
+        async def fake_post(url, headers, payload, *, timeout=30.0):
+            seen["url"] = url; seen["payload"] = payload; seen["auth"] = headers.get("authorization")
+            return {"choices": [{"message": {"content": "a dog"}}]}
+        llm._http_post = fake_post  # type: ignore
+        out = await llm.describe_image("http://x/y.jpg", "what?")
+        assert out == "a dog", f"Expected 'a dog', got {out}"
+        assert seen["url"].endswith("/v1/chat/completions"), f"URL: {seen['url']}"
+        assert seen["auth"] == "Bearer sk", f"Auth: {seen['auth']}"
+        # image part present
+        content = seen["payload"]["messages"][0]["content"]
+        assert any(p.get("type") == "image_url" for p in content), f"No image_url in {content}"
+    finally:
+        _clear()
+
 def main():
     test_unconfigured_is_none_and_false()
     test_forge_backcompat()
     test_explicit_provider_wins()
     asyncio.run(test_calls_return_none_when_unconfigured())
+    asyncio.run(test_openai_compat_describe())
+    import importlib
+    importlib.reload(llm)
     _clear()
     print("\033[32mPASS\033[0m insight.llm config")
 
