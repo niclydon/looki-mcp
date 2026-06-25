@@ -84,6 +84,16 @@ def media_key(journal_id: str, date: str | None, idx: int, kind: str, url: str) 
     return f"journals/{safe_date}/{journal_id}/{idx}_{kind}{_ext_from_url(url)}"
 
 
+def media_key_for(prefix: str, owner_id: str, date: str | None, idx: int, kind: str, url: str) -> str:
+    """Generic, idempotent object key for any namespace (moments, for_you, insight).
+
+    Mirrors media_key() but parameterizes the top-level prefix + owner id so moment
+    and for_you hero images don't collide with the journals/ tree.
+    """
+    safe_date = date or "undated"
+    return f"{prefix}/{safe_date}/{owner_id}/{idx}_{kind}{_ext_from_url(url)}"
+
+
 def _content_type_for(key: str, fallback: str | None) -> str:
     ext = key.rsplit(".", 1)[-1].lower() if "." in key else ""
     return _CONTENT_TYPES.get(ext) or (fallback or "application/octet-stream")
