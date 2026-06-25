@@ -11,11 +11,13 @@ failure so tool error handling stays simple.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
 
 from looki_mcp.config import get_config
+from looki_mcp.insight.governor import get_governor
 
 
 class LookiApiError(Exception):
@@ -81,3 +83,37 @@ def format_error(exc: Exception) -> str:
     if isinstance(exc, httpx.RequestError):
         return f"Network error: {exc}. Check your internet connection."
     return f"Unexpected error: {exc}"
+
+
+_MAX_RETRY_AFTER_SECONDS = 30.0
+
+
+async def governed_get(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    params: dict | None = None,
+    max_retries: int = 2,
+) -> httpx.Response:
+    """GET routed through the shared rate governor, with 429 Retry-After backoff.
+
+    Raises httpx.HTTPStatusError if still 429 after max_retries (callers map it
+    via format_error). Non-429 4xx/5xx raise immediately via raise_for_status().
+    """
+    governor = get_governor()
+    attempt = 0
+    while True:
+        async with governor.slot():
+            response = await client.get(url, params=params)
+        if response.status_code != 429:
+            response.raise_for_status()
+            return response
+        if attempt >= max_retries:
+            response.raise_for_status()  # raises HTTPStatusError(429)
+        retry_after = response.headers.get("retry-after")
+        try:
+            delay = min(float(retry_after), _MAX_RETRY_AFTER_SECONDS) if retry_after else 1.0
+        except ValueError:
+            delay = 1.0
+        await asyncio.sleep(delay)
+        attempt += 1
