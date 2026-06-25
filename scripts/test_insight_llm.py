@@ -12,34 +12,46 @@ def _clear():
     for k in _KEYS: os.environ.pop(k, None)
 
 def test_unconfigured_is_none_and_false():
-    _clear()
-    assert llm.resolve_provider() is None
-    assert llm.llm_configured() is False
-    assert vlm_false()
+    try:
+        _clear()
+        assert llm.resolve_provider() is None
+        assert llm.llm_configured() is False
+        assert vlm_false()
+    finally:
+        _clear()
 def vlm_false():
     return llm.vlm_configured() is False
 
 def test_forge_backcompat():
-    _clear()
-    os.environ["FORGE_URL"] = "http://forge.local"
-    os.environ["FORGE_VLM_MODEL"] = "openai/gpt-4.1-mini"
-    cfg = llm.resolve_provider()
-    assert cfg and cfg["provider"] == "openai_compatible"
-    assert cfg["base_url"] == "http://forge.local"
-    assert cfg["vlm_model"] == "openai/gpt-4.1-mini"
+    try:
+        _clear()
+        os.environ["FORGE_URL"] = "http://forge.local"
+        os.environ["FORGE_VLM_MODEL"] = "openai/gpt-4.1-mini"
+        cfg = llm.resolve_provider()
+        assert cfg and cfg["provider"] == "openai_compatible"
+        assert cfg["base_url"] == "http://forge.local"
+        assert cfg["vlm_model"] == "openai/gpt-4.1-mini"
+    finally:
+        _clear()
 
 def test_explicit_provider_wins():
-    _clear()
-    os.environ.update({"LOOKI_LLM_PROVIDER":"anthropic","LOOKI_LLM_API_KEY":"sk","LOOKI_LLM_MODEL":"claude-haiku-4-5"})
-    cfg = llm.resolve_provider()
-    assert cfg["provider"] == "anthropic" and cfg["model"] == "claude-haiku-4-5"
-    assert llm.llm_configured() is True
+    try:
+        _clear()
+        os.environ.update({"LOOKI_LLM_PROVIDER":"anthropic","LOOKI_LLM_API_KEY":"sk","LOOKI_LLM_MODEL":"claude-haiku-4-5"})
+        cfg = llm.resolve_provider()
+        assert cfg["provider"] == "anthropic" and cfg["model"] == "claude-haiku-4-5"
+        assert llm.llm_configured() is True
+    finally:
+        _clear()
 
 async def test_calls_return_none_when_unconfigured():
-    _clear()
-    assert await llm.describe_image("http://x/y.jpg", "what?") is None
-    assert await llm.synthesize("sys", "user") is None
-    assert await llm.caption_images(["a","b"], "p") == [None, None]
+    try:
+        _clear()
+        assert await llm.describe_image("http://x/y.jpg", "what?") is None
+        assert await llm.synthesize("sys", "user") is None
+        assert await llm.caption_images(["a","b"], "p") == [None, None]
+    finally:
+        _clear()
 
 def main():
     test_unconfigured_is_none_and_false()
