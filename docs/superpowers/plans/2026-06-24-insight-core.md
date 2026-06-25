@@ -626,7 +626,7 @@ async def _provider_image(cfg, prompt, image_url, max_tokens):
 async def _provider_json(cfg, system, user, schema):
     if cfg["provider"] == "anthropic":
         return await _anthropic_messages(cfg, system + " Respond with ONLY valid JSON.", [{"type": "text", "text": user}], max_tokens=900)
-    return await _gemini_generate(cfg, system, [{"text": user}], max_tokens=900, json_schema=schema)
+    return await _gemini_generate(cfg, system, [{"text": user}], max_tokens=900, force_json=True)
 
 def _anthropic_image_source(url: str) -> dict:
     # Expects a data: URL (base64). PR3's VLM tools download bytes first (spec M4).
@@ -642,16 +642,16 @@ def _gemini_image_part(url: str) -> dict:
         return {"inline_data": {"mime_type": header.split(";")[0].removeprefix("data:"), "data": b64}}
     return {"file_data": {"file_uri": url}}
 
-async def _gemini_generate(cfg: dict, system: str, parts: list, *, max_tokens: int, json_schema: dict | None = None) -> str | None:
+async def _gemini_generate(cfg: dict, system: str, parts: list, *, max_tokens: int, force_json: bool = False) -> str | None:
     base = (cfg["base_url"] or "https://generativelanguage.googleapis.com").rstrip("/")
     url = f"{base}/v1beta/models/{cfg['model']}:generateContent?key={cfg['api_key']}"
     payload: dict = {"contents": [{"parts": parts}], "generationConfig": {"maxOutputTokens": max_tokens}}
     if system:
         payload["systemInstruction"] = {"parts": [{"text": system}]}
-    if json_schema is not None or json_schema is None and False:
+    if force_json:
+        # Gemini's reliable structured-output knob is responseMimeType; its OpenAI-compat
+        # json_schema support is partial, so we ask for JSON and parse in extract_json.
         payload["generationConfig"]["responseMimeType"] = "application/json"
-        if json_schema:
-            payload["generationConfig"]["responseSchema"] = json_schema
     data = await _http_post(url, {"content-type": "application/json"}, payload)
     cands = data.get("candidates", [])
     if not cands:
@@ -660,7 +660,7 @@ async def _gemini_generate(cfg: dict, system: str, parts: list, *, max_tokens: i
     return gparts[0].get("text") if gparts else None
 ```
 
-Note: in `extract_json`, route gemini through `_provider_json` which sets `responseMimeType=application/json` — fix the guard to `if True:` for the JSON path (the `json_schema` branch). Keep it simple: in `_provider_json` gemini call, pass a sentinel so `_gemini_generate` always sets JSON mime. Adjust `_gemini_generate` to accept `force_json: bool=False` and set the mime when true; call with `force_json=True` from `_provider_json`.
+Note: `extract_json` parses the returned text with `json.loads` (Task 4) regardless of provider; the Gemini path sets `responseMimeType=application/json` via `force_json=True` so the model returns parseable JSON. The `schema` arg to `extract_json` is advisory (used in the system prompt), not sent as a provider `responseSchema`, since cross-provider schema support is uneven.
 
 - [ ] **Step 4: Run test to verify it passes**
 
