@@ -12,6 +12,7 @@ import httpx
 from fastmcp import FastMCP
 
 from looki_mcp.client import format_error, get_client, unwrap
+from looki_mcp.file_helpers import file_dimensions, file_duration_ms
 
 
 def _first_video_file(payload: Any) -> dict[str, Any] | None:
@@ -76,7 +77,9 @@ def register_video_tools(mcp: FastMCP) -> None:
             url = file_obj.get("temporary_url")
             if not isinstance(url, str) or not url:
                 return json.dumps({"moment_id": moment_id, "frames": [], "frame_count": 0, "max_frames": max_frames, "truncated": False, "reason": "video_url_missing"}, indent=2)
-            duration_s = float(file_obj.get("duration_ms", 0) or 0) / 1000.0
+            duration_ms = file_duration_ms(file_obj)
+            duration_s = float(duration_ms or 0) / 1000.0
+            width, height = file_dimensions(file_obj)
             timestamps = _sample_timestamps(duration_s, max_frames)
             tmp_path = Path(tempfile.mkdtemp(prefix="looki-video-frames-"))
             video_path = tmp_path / "source.mp4"
@@ -90,8 +93,8 @@ def register_video_tools(mcp: FastMCP) -> None:
                 frames.append({
                     "t_s": timestamps[index] if index < len(timestamps) else None,
                     "url": frame_path.as_uri(),
-                    "width": None,
-                    "height": None,
+                    "width": width,
+                    "height": height,
                 })
             return json.dumps({
                 "moment_id": moment_id,
