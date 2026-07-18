@@ -3,6 +3,43 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-07-18 — Open API contract parity (RP-57)
+
+Discovered and shipped Looki Open API **contract drift** (not new endpoints).
+Endpoint inventory still 12 authenticated routes; MCP already mirrored them.
+Filed as ProjectManager track **RP-57** (`looki-mcp-api-contract-parity`) with
+six OBs **52625–52630**, all closed `done`.
+
+**Discovery.** Skill `web.looki.ai/agent/looki-memory/SKILL.md` (sha256 prefix
+`4c5c991cb1165b91`) + live probe of ~100 paths. No OpenAPI JSON. SPA routes
+(`/loom`, `/albums`, `/moments/by-cursor`, …) are private app API — 404 on Open
+platform. False 422s were path-param UUID validation, not hidden routes.
+
+**P0 fixes.** `looki_mcp/file_helpers.py` (`file_duration_ms` prefers
+`metadata.duration_ms`); `extract_video_frames` wired to it; highlights
+`group` ∈ `{all,vlog,other}` only; journals `sort_order` accepts ASC/DESC
+aliases but wires lowercase `asc`/`desc`.
+
+**P1–P3.** `models.py` + `journals_api_findings.md` refreshed for 2026-07 shapes
+(FileModel.metadata, realtime `latest_file`, expanded journal/for_you types);
+geo parses location JSON strings; `scripts/api_contract_probe.py` for skill
+hash + live enum matrix.
+
+**Ship.** Projects pack on branch then `main` merge `4f4bd2a`; prod
+`/services/looki-mcp` restarted; health `tools:24`; unit + live probe green.
+OBs closed via `nexus_ob_close_verified`.
+
+**Topology cleanup.** GitHub default → **main**; deleted `master` (local +
+remote); prod checkout on `main @ 4f4bd2a`; only remote branch is `main`.
+Unmerged PR2 tip preserved as tags `archive/feat-insight-tools-pr2` and
+`archive/fix-rp57-api-contract-parity` (not deployed — still 24 tools).
+
+**Unblocked.** Contract-faithful tools + re-probe harness + main-only git.
+**Pending.** Land PR2 insight tools from archive tag when ready; optional
+RP-57 track close in Nexus.
+
+Full story: `docs/narrative/2026-07-18-api-contract-parity-rp57.md`
+
 ## 2026-06-21 — Journals API tools + MinIO media capture (14 → 24 tools)
 
 Added full support for the new Looki `/journals` endpoint family and durable

@@ -1301,3 +1301,14 @@ git commit -m "refactor(realtime): describe_realtime_event onto insight.llm + en
 ## Execution Handoff
 
 PR2 (LLM-free tools: `journal_mine`/`geo`/`temporal` + `commitment_harvester`/`the_unwritten`/`places_of_my_life`) and PR3 (deep + vision tools) each get their own plan authored **after** PR1 lands, so their task code binds to the real, merged Insight Core interfaces rather than speculative ones.
+
+---
+
+## Related (2026-07-18)
+
+Open API **contract parity** (FileModel `metadata.duration_ms`, highlights `group`
+enum, journals `sort_order` case, models refresh, geo JSON locations, probe
+harness) shipped as Nexus **RP-57** / OBs 52625–52630 — orthogonal to PR1/PR2
+tool surface. Prod remains 24 tools. Full story:
+`docs/narrative/2026-07-18-api-contract-parity-rp57.md`. PR2 insight tools tip
+archived as git tag `archive/feat-insight-tools-pr2` (not deployed).
