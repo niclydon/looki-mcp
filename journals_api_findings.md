@@ -1,6 +1,9 @@
 # Looki API Findings: `/journals` Endpoints
 
-**Status:** Authoritative mapping, validated against the live API on **2026-06-20**.
+**Status:** Authoritative mapping, validated against the live API on **2026-06-20**,
+re-checked **2026-07-18** (FileModel `metadata` nesting; `sort_order` must be
+lowercase `asc`|`desc`; additional journal types `COMIC_PAGE`, `WEEKLY_JOURNAL`,
+`SYSTEM_POST` observed).
 **Sources:** (1) Official Looki agent skill `https://web.looki.ai/agent/looki-memory/SKILL.md`
 (the canonical param contract); (2) direct live probing of the user's account (the real
 content shape, which the skill doc only sketches with a single `DIARY` example).
@@ -18,7 +21,7 @@ All are `GET`, require the `X-API-Key` header, share the base URL
 
 | Endpoint | Params | `data` shape |
 |---|---|---|
-| `/journals` | `cursor_date` (YYYY-MM-DD, optional), `max_days` (int, default **7**, max **31**), `sort_order` (`ASC`\|`DESC`, default `DESC`) | `{ items: DayBucket[], next_cursor_id: str\|null, has_more: bool }` |
+| `/journals` | `cursor_date` (YYYY-MM-DD, optional), `max_days` (int, default **7**, max **31**), `sort_order` (**`asc`\|`desc` lowercase only**, default newest-first) | `{ items: DayBucket[], next_cursor_id: str\|null, has_more: bool }` |
 | `/journals/calendar` | `start_date` (req), `end_date` (req) — YYYY-MM-DD | **bare** `[{ date: str }]` — which days have entries |
 | `/journals/by_date` | `on_date` (req, YYYY-MM-DD) | **bare** `DayBucket[]` for that date |
 | `/journals/{id}` | path: journal UUID | a single `JournalEntry` object |
@@ -26,7 +29,7 @@ All are `GET`, require the `X-API-Key` header, share the base URL
 ### Param notes (validated live)
 - `max_days` counts **distinct days**, not entries (`max_days=2`→2 days, `=14`→14 days). The default with NO params is 7.
 - `limit`, `on_date`, `type`, `start_date`/`end_date` are **silently ignored** by `/journals` (they are NOT real params — earlier guesses were wrong; the endpoint fell back to default 7 days).
-- `sort_order` is documented `ASC`/`DESC` (default `DESC` = newest first). Passing it explicitly produced subtly different ordering in probing; treat as pass-through, default unset = newest-first.
+- `sort_order` live enum is **`asc`/`desc` only** (uppercase `ASC`/`DESC` → envelope code 100). Skill text may still say ASC/DESC — MCP accepts aliases and wires lowercase. Default unset = newest-first.
 
 ## Pagination / Backfill (cursor is a DATE)
 `next_cursor_id` is a **date string** (e.g. `"2026-06-14"`), not an opaque ID. To page
@@ -66,7 +69,8 @@ JournalEntry = {
   created_at: str          // ISO 8601 — when the entry was generated
 }
 MediaItem = { source: FileModel, thumbnail: FileModel|null }
-FileModel  = { temporary_url: str, media_type: str, size: int|null, duration_ms: int|null }
+FileModel  = { temporary_url: str, media_type: str, metadata?: {width, height, duration_ms?} }
+// 2026-07: size/duration_ms no longer top-level; prefer metadata
 ```
 The single-entry `/journals/{id}` payload is exactly one `JournalEntry` (same fields as
 the embedded list form — no extra detail fields).
@@ -78,8 +82,11 @@ the embedded list form — no extra detail fields).
 | `DIETARY` | yes | long ~2500c nutrition analysis | 1 × `dietary_image` | no | per-meal log |
 | `AUDIO_SUMMARY` | yes | long ~2500c | 1 × `meeting_analysis_cover_image` | no | meeting / audio recap |
 | `DIARY` | — | short ~96–184c (often == description) | ~0.6 × `user_event_diary_image` | no | atomic event vignette |
-| `STORYBOARD` | yes | none (desc only) | 1 × `storyboard_image` | **yes** | comic-style multi-day recap |
-| `DAILY_ROUTINE` | yes | none (desc only) | 1 × `daily_routine_image` | **yes** | periodic routine summary |
+| `STORYBOARD` | yes | none (desc only) | 1 × `storyboard_image` | **yes** | comic-style multi-day recap (rare 2026-07) |
+| `DAILY_ROUTINE` | yes | none (desc only) | 1 × `daily_routine_image` | **yes** | periodic routine summary (rare 2026-07) |
+| `COMIC_PAGE` | varies | varies | comic image | no | observed 2026-07 |
+| `WEEKLY_JOURNAL` | varies | long | varies | multi-day | observed 2026-07 |
+| `SYSTEM_POST` | varies | varies | varies | no | observed 2026-07 |
 
 Observed mix per recent day: ~5 `DIARY` + 1 `DIETARY` + 1 `YESTERDAY_RECAP`, plus
 occasional `STORYBOARD`/`DAILY_ROUTINE`/`AUDIO_SUMMARY` buckets. ≈7 entries/day, and

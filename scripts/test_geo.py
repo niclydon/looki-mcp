@@ -25,8 +25,34 @@ def test_name_is_most_common_spelling():
     assert len(out["places"]) == 1
     assert out["places"][0]["name"] == "The Gym" and out["places"][0]["count"] == 3
 
+def test_json_address_normalizes_to_locality():
+    raw = (
+        '{"street":"285 Hancock St, Quincy, MA 02171, USA",'
+        '"locality":"Quincy","subAdministrativeArea":"Norfolk County",'
+        '"administrativeArea":"Massachusetts","isoCountryCode":"US"}'
+    )
+    key = normalize_location(raw)
+    assert key is not None
+    assert "quincy" in key
+    assert "{" not in key
+    # slight JSON whitespace difference still same place
+    raw2 = raw.replace("285 Hancock", "999 Hancock")
+    out = cluster_locations([raw, raw2, raw])
+    assert out["unknown_count"] == 0
+    assert len(out["places"]) == 1
+    assert out["places"][0]["count"] == 3
+    assert "Quincy" in out["places"][0]["name"]
+
+def test_invalid_json_falls_back():
+    assert normalize_location("{not-json") == "{not-json"
+    assert normalize_location("{}") is None or normalize_location("{}") == "{}"
+
 def main():
-    test_normalize(); test_cluster_groups_and_counts(); test_name_is_most_common_spelling()
+    test_normalize()
+    test_cluster_groups_and_counts()
+    test_name_is_most_common_spelling()
+    test_json_address_normalizes_to_locality()
+    test_invalid_json_falls_back()
     print("\033[32mPASS\033[0m geo")
 
 if __name__ == "__main__":

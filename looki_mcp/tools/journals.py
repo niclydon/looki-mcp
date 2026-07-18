@@ -258,6 +258,21 @@ def _capture_summary(reports: list[dict]) -> dict:
     }
 
 
+def normalize_sort_order(sort_order: str) -> str | None:
+    """Map agent-facing sort_order to the live API wire value.
+
+    Live Open API (2026-07) accepts only lowercase ``asc`` | ``desc``.
+    Agents may still pass ASC/DESC aliases; those are normalized here.
+    Returns None when the value is not a recognized order.
+    """
+    if not isinstance(sort_order, str):
+        return None
+    key = sort_order.strip().lower()
+    if key in {"asc", "desc"}:
+        return key
+    return None
+
+
 def register_journals_tools(mcp: FastMCP) -> None:
     @mcp.tool
     async def get_journals(
@@ -279,23 +294,25 @@ def register_journals_tools(mcp: FastMCP) -> None:
         Args:
             cursor_date: Page cursor (YYYY-MM-DD) from a previous response's next_cursor_id. Omit for the most recent entries.
             max_days: Number of distinct days to return. Between 1 and 31, default 7.
-            sort_order: Day ordering, 'ASC' or 'DESC'. Default 'DESC' (newest first).
+            sort_order: Day ordering. Accepts asc/desc or ASC/DESC (case-insensitive).
+                Wire protocol is lowercase; default DESC (newest first; param omitted).
             mode: Detail level — 'index' (id/title spine), 'summary' (truncated content, default), or 'full' (verbatim API payload with raw day-buckets).
         """
         if not (1 <= max_days <= 31):
             return "Error: max_days must be between 1 and 31."
-        if sort_order not in {"ASC", "DESC"}:
-            return "Error: sort_order must be 'ASC' or 'DESC'."
+        wire_order = normalize_sort_order(sort_order)
+        if wire_order is None:
+            return "Error: sort_order must be 'asc' or 'desc' (ASC/DESC aliases accepted)."
         if mode not in _MODES:
             return f"Error: mode must be one of {sorted(_MODES)}."
         try:
             params: dict[str, str | int] = {"max_days": max_days}
             if cursor_date is not None:
                 params["cursor_date"] = cursor_date
-            # Only send sort_order when overriding the default — passing it
-            # explicitly alters ordering subtly (see journals_api_findings.md).
-            if sort_order != "DESC":
-                params["sort_order"] = sort_order
+            # Default newest-first: omit sort_order (API default). Only send
+            # lowercase wire value when requesting oldest-first.
+            if wire_order != "desc":
+                params["sort_order"] = wire_order
             async with get_client() as client:
                 response = await client.get("/journals", params=params)
                 data = unwrap(response)

@@ -6,14 +6,17 @@ work with — they are NOT currently enforced as runtime validators. Tools call
 unmodified, so model drift never breaks tool behavior; it only affects how
 accurately the docs match reality.
 
-All shapes below have been verified against the live Looki API as of 2026-04-29
-(moments / highlights / profile / realtime) and 2026-06-20 (journals).
+All shapes below have been re-verified against the live Looki Open API as of
+**2026-07-18** (moments / highlights / profile / realtime / journals / FileModel
+metadata nesting). Earlier bulk checks: 2026-04-29 (moments/highlights/profile/
+realtime) and 2026-06-20 (journals feed).
+
 The Looki API wraps every response in `{code, detail, data}`; our `unwrap()`
 helper strips that envelope, so the models below describe the *unwrapped* `data`
 field, not the raw HTTP body.
 
-Field names sourced from observed responses + the Looki ClaWHub documentation:
-https://clawhub.ai/haibo-looki/looki-memory
+Canonical docs: https://web.looki.ai/agent/looki-memory/SKILL.md
+Also: https://clawhub.ai/haibo-looki/looki-memory
 """
 
 from __future__ import annotations
@@ -31,23 +34,44 @@ class ProfileResponse(BaseModel):
     first_name: str
     last_name: str
     tz: str  # UTC offset in HH:MM form, e.g. "-04:00", NOT an IANA name
-    email: str | None = None
+    email: str | None = None  # often omitted on live account payloads
     gender: int | None = None  # Integer code (e.g. 1, 2), not a string
     birthday: str | None = None  # YYYY-MM-DD
     region: str | None = None
     kind: int | None = None
 
 
-class FileModel(BaseModel):
-    """Underlying media file. Lives inside MomentFileModel.file."""
+class FileMetadata(BaseModel):
+    """Nested under FileModel.metadata (live 2026-07)."""
 
-    temporary_url: str  # Presigned URL, valid ~1 hour
-    media_type: str  # "IMAGE" | "VIDEO" (uppercase per live API)
+    width: int | None = None
+    height: int | None = None
+    duration_ms: int | None = None  # video/audio; may be null on still images
+
+
+class FileModel(BaseModel):
+    """Underlying media file. Lives inside MomentFileModel.file, journal media,
+    for_you cover/file, and realtime latest_file.
+
+    **2026-07 live shape:** duration and dimensions live under `metadata`.
+    Top-level `size` / `duration_ms` are legacy fallbacks (not present on current
+    moments/files responses). Presigned URLs often expire ~10 minutes (JWT),
+    though skill docs still say ~1 hour generically.
+    Host observed: `devo-user-file.looki.ai`.
+    """
+
+    temporary_url: str
+    media_type: str  # "IMAGE" | "VIDEO" | "AUDIO" (uppercase per live API)
+    metadata: FileMetadata | None = None
+    # Legacy / optional — prefer metadata.duration_ms
     size: int | None = None
     duration_ms: int | None = None
 
 
 class LocationModel(BaseModel):
+    """Historical structured lat/lng shape. Live payloads more often put a
+    **JSON string** of address parts on `location` (see MomentFileModel)."""
+
     latitude: float
     longitude: float
     address: str | None = None
@@ -60,7 +84,9 @@ class MomentFileModel(BaseModel):
     id: str
     file: FileModel
     thumbnail: FileModel | None = None
-    location: LocationModel | None = None
+    # Live: usually a JSON-encoded address string, not LocationModel:
+    # {"street":"...","locality":"Quincy","administrativeArea":"Massachusetts",...}
+    location: str | LocationModel | None = None
     created_at: str | None = None
     tz: str | None = None
 
@@ -92,9 +118,9 @@ class CalendarDayModel(BaseModel):
 
 # /moments/calendar returns: list[CalendarDayModel]
 # /moments?on_date=...   returns: list[MomentModel]
-# /moments/{id}/files    returns: {"items": list[MomentFileModel], maybe cursor_id, has_more}
-# /moments/search        returns: {"items": list[MomentModel], maybe cursor_id, has_more}
-# /for_you/items         returns: {"items": list[ForYouItemModel], maybe cursor_id, has_more}
+# /moments/{id}/files    returns: {"items": list[MomentFileModel], next_cursor_id, has_more}
+# /moments/search        returns: {"items": list[MomentModel], has_more}  (page-based)
+# /for_you/items         returns: {"items": list[ForYouItemModel], next_cursor_id, has_more}
 
 
 class PaginatedItems(BaseModel):
@@ -105,30 +131,33 @@ class PaginatedItems(BaseModel):
 
     items: list  # type-varying; see specific subclasses
     cursor_id: str | None = None
+    next_cursor_id: str | None = None
     has_more: bool | None = None
 
 
 class MomentFilesResponse(BaseModel):
     items: list[MomentFileModel]
-    cursor_id: str | None = None
+    next_cursor_id: str | None = None
     has_more: bool | None = None
 
 
 class SearchMomentsResponse(BaseModel):
     items: list[MomentModel]
-    cursor_id: str | None = None
     has_more: bool | None = None
-    # No page / page_size / total in the live response — pagination is cursor-based.
+    # Live 2026-07: page/page_size query params; response may omit next_cursor_id.
 
 
 class ForYouItemModel(BaseModel):
-    """AI-generated highlight content. The `type` field uses uppercase API codes
-    (e.g. "DAILY_VLOG"). Our get_highlights tool exposes friendlier values to
-    callers (`vlog`, `comic`, etc.) but Looki's vocabulary is the source of truth
-    for what gets returned here."""
+    """AI-generated highlight content. The `type` field uses uppercase API codes.
+
+    Observed types (2026-07): DAILY_VLOG, USER_VLOG, MOMENT_POST, IMAGE_POST,
+    IMAGE_POST_WEEKLY_LIFE_COLORS, USER_EVENT_ANALYSIS.
+
+    Query `group` filter (live): **all | vlog | other** only — not comic/present.
+    """
 
     id: str
-    type: str  # e.g. "DAILY_VLOG", "COMIC", etc. — uppercase per live API
+    type: str
     title: str | None = None
     description: str | None = None
     content: str | None = None
@@ -140,15 +169,25 @@ class ForYouItemModel(BaseModel):
 
 class HighlightsResponse(BaseModel):
     items: list[ForYouItemModel]
-    cursor_id: str | None = None
+    next_cursor_id: str | None = None
     has_more: bool | None = None
 
 
 class RealtimeEventResponse(BaseModel):
-    """Returned by /realtime/latest-event. Beta endpoint; requires Proactive Mode."""
+    """Returned by /realtime/latest-event. Beta; requires Proactive Mode.
+
+    Live 2026-07 fields include latest_file (snapshot) and start/end times.
+    """
 
     id: str | None = None
     description: str | None = None
+    latest_file: FileModel | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    tz: str | None = None
+    # Often a JSON address string (same shape as moment file location)
+    location: str | None = None
+    # Legacy aliases (older docs); not seen on 2026-07 live payload
     timestamp: str | None = None
     detected_at: str | None = None
 
@@ -157,16 +196,16 @@ class JournalMediaFile(BaseModel):
     """The image (or other media) behind a journal media item. AI-generated; only
     `IMAGE` observed in journals so far (VIDEO/AUDIO permitted but unseen)."""
 
-    temporary_url: str  # Presigned URL; short-lived JWT (~10 min observed, shorter than moments' ~1h)
+    temporary_url: str  # short-lived JWT (~10 min observed)
     media_type: str  # "IMAGE" per live API
-    size: int | None = None
-    duration_ms: int | None = None
+    metadata: FileMetadata | None = None
+    size: int | None = None  # legacy
+    duration_ms: int | None = None  # legacy
 
 
 class JournalMediaItem(BaseModel):
     """One media attachment on a journal entry. The `source.temporary_url` path
-    encodes provenance: /processed/{user_event_diary_image|dietary_image|
-    storyboard_image|meeting_analysis_cover_image|daily_routine_image}/..."""
+    encodes provenance under /processed/{category}/..."""
 
     source: JournalMediaFile
     thumbnail: JournalMediaFile | None = None
@@ -174,17 +213,18 @@ class JournalMediaItem(BaseModel):
 
 class JournalEntryModel(BaseModel):
     """A single journal entry. Returned both embedded in JournalDayBucketModel.journals
-    and bare from GET /journals/{id}. Six observed `type` values, each with a different
-    text/media profile (see journals_api_findings.md):
-    YESTERDAY_RECAP (long recap, no title/media), DIETARY & AUDIO_SUMMARY (titled, long
-    content, 1 image), DIARY (short vignette, ~0.6 images), STORYBOARD & DAILY_ROUTINE
-    (titled, description-only, multi-day, 1 image)."""
+    and bare from GET /journals/{id}.
+
+    Types observed 2026-07: DIARY, YESTERDAY_RECAP, DIETARY, AUDIO_SUMMARY,
+    COMIC_PAGE, WEEKLY_JOURNAL, SYSTEM_POST.
+    Earlier observations also included STORYBOARD, DAILY_ROUTINE (may be rare).
+    """
 
     id: str  # UUID — use with /journals/{id}
-    type: str  # YESTERDAY_RECAP | DIETARY | AUDIO_SUMMARY | DIARY | STORYBOARD | DAILY_ROUTINE
+    type: str
     title: str | None = None  # null on DIARY / YESTERDAY_RECAP
     description: str
-    content: str | None = None  # null on STORYBOARD / DAILY_ROUTINE
+    content: str | None = None
     media_items: list[JournalMediaItem] = []
     date: str  # YYYY-MM-DD
     start_date: str | None = None  # range start for multi-day types
@@ -212,14 +252,17 @@ class JournalCalendarDayModel(BaseModel):
 
 class JournalsFeedResponse(BaseModel):
     """GET /journals. `next_cursor_id` is a DATE string (not an opaque id) — pass it
-    back as the `cursor_date` query param to page into older history."""
+    back as the `cursor_date` query param to page into older history.
+
+    Query `sort_order` live enum: **asc | desc** (lowercase only).
+    """
 
     items: list[JournalDayBucketModel]
     next_cursor_id: str | None = None
     has_more: bool | None = None
 
 
-# /journals            returns: JournalsFeedResponse  (params: cursor_date, max_days≤31, sort_order)
+# /journals            returns: JournalsFeedResponse  (params: cursor_date, max_days≤31, sort_order=asc|desc)
 # /journals/calendar   returns: list[JournalCalendarDayModel]  (params: start_date, end_date)
 # /journals/by_date    returns: list[JournalDayBucketModel]    (params: on_date)
 # /journals/{id}       returns: JournalEntryModel
