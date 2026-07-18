@@ -8,6 +8,18 @@ from fastmcp import FastMCP
 
 from looki_mcp.client import format_error, get_client, unwrap
 
+# Live Open API enum (2026-07): only these values are accepted on /for_you/items.
+# Comic-like content appears as item `type`s under group=other, not as a group filter.
+VALID_GROUPS = frozenset({"all", "vlog", "other"})
+VALID_ORDER_BY = frozenset({"created_at", "recorded_at"})
+
+
+def validate_highlights_group(group: str) -> str | None:
+    """Return an Error string if group is invalid, else None."""
+    if group not in VALID_GROUPS:
+        return f"Error: group must be one of {sorted(VALID_GROUPS)}."
+    return None
+
 
 def register_highlights_tools(mcp: FastMCP) -> None:
     @mcp.tool
@@ -23,12 +35,13 @@ def register_highlights_tools(mcp: FastMCP) -> None:
         order_by: str = "recorded_at",
     ) -> str:
         """
-        Returns AI-generated highlight content created from captured memories — comics,
-        vlogs, and other curated formats. Use when the user asks to see their highlights,
+        Returns AI-generated highlight content created from captured memories — vlogs
+        and other curated formats. Use when the user asks to see their highlights,
         creative content, or AI-generated summaries of their memories.
 
         Args:
-            group: Filter by highlight type. One of: all, comic, vlog, present, other. Default all.
+            group: Filter by highlight group. One of: all, vlog, other. Default all.
+                (Comic-style items may appear under group=other via their type field.)
             liked: If True, return only liked highlights. Omit for all.
             recorded_from: Filter to highlights recorded on or after this date (YYYY-MM-DD).
             recorded_to: Filter to highlights recorded on or before this date (YYYY-MM-DD).
@@ -38,12 +51,11 @@ def register_highlights_tools(mcp: FastMCP) -> None:
             limit: Number of highlights to return. Between 1 and 100, default 20.
             order_by: Sort field. One of: created_at, recorded_at. Default recorded_at.
         """
-        valid_groups = {"all", "comic", "vlog", "present", "other"}
-        if group not in valid_groups:
-            return f"Error: group must be one of {sorted(valid_groups)}."
-        valid_order = {"created_at", "recorded_at"}
-        if order_by not in valid_order:
-            return f"Error: order_by must be one of {sorted(valid_order)}."
+        group_err = validate_highlights_group(group)
+        if group_err is not None:
+            return group_err
+        if order_by not in VALID_ORDER_BY:
+            return f"Error: order_by must be one of {sorted(VALID_ORDER_BY)}."
         if not (1 <= limit <= 100):
             return "Error: limit must be between 1 and 100."
         try:
