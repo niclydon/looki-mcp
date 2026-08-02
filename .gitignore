@@ -13,3 +13,24 @@ build/
 tmp/
 .claude/
 .remember/
+
+# BEGIN AI-CLI-WORKING-FOLDERS
+# Local AI/CLI harness state — never commit (session, skills cache, scratch).
+# Managed across all repos; keep in sync with ~/.config/git/ignore.
+.claude/
+.codex/
+.codex
+.grok/
+.claire/
+.antigravitycli/
+.agents/
+.kimi-code/
+.kimi/
+.remember/
+.cursor/
+.aider/
+.continue/
+.windsurf/
+.opencode/
+**/.claude/settings.local.json
+# END AI-CLI-WORKING-FOLDERS
