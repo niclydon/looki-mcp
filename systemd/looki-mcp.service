@@ -2,17 +2,15 @@
 Description=looki-mcp — MCP server for the Looki wearable camera API
 After=network-online.target
 Wants=network-online.target
-# StartLimitIntervalSec must be in [Unit], not [Service]. =0 disables restart rate limiting
-# (prevents systemd from giving up on repeated restarts during early debugging).
 StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-User=looki
-Group=looki
-WorkingDirectory=/opt/looki-mcp
-EnvironmentFile=/opt/looki-mcp/.env
-ExecStart=/opt/looki-mcp/.venv/bin/python /opt/looki-mcp/main.py
+User=niclydon
+Group=niclydon
+WorkingDirectory=/services/looki-mcp
+EnvironmentFile=/services/looki-mcp/.env
+ExecStart=/services/looki-mcp/.venv/bin/python main.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
