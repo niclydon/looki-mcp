@@ -3,6 +3,19 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-08-09 — systemd unit adoption, repo:=deployed (OB-53769)
+
+Adopted the deployed `/etc/systemd/system/looki-mcp.service` and
+`looki-mcp.service.d/restart-policy.conf` (OB-53766 widened restart envelope:
+`Restart=always`, `RestartSec=15`, `StartLimitBurst=20` over 15min) into git,
+byte-for-byte from the live files (empty diffs at adoption time — provable
+no-op, no service touched). This OVERWRITES the stale repo unit: the deployed
+reality (`User=niclydon`, `/services/looki-mcp`) wins; the old `/opt/looki-mcp`
++ `looki` service-user hardening intent is retired until deliberately revived
+(it also carried `StartLimitIntervalSec=0`, which predates the restart-policy
+evolution). Added `scripts/install-systemd.sh` (install unit + drop-in,
+daemon-reload, diff-check; no restart).
+
 ## 2026-07-18 — Open API contract parity (RP-57)
 
 Discovered and shipped Looki Open API **contract drift** (not new endpoints).
