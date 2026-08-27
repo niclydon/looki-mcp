@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.deployed-sha
 venv/
 dist/
 build/

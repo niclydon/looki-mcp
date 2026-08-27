@@ -16,7 +16,7 @@ git init -q -b main "$seed"
 git -C "$seed" config user.email test@example.invalid
 git -C "$seed" config user.name test
 printf 'fastmcp\n' > "$seed/requirements.txt"
-printf '.env\n.venv/\n.deployed-sha\n' > "$seed/.gitignore"
+cp "$repo_root/.gitignore" "$seed/.gitignore"
 git -C "$seed" add requirements.txt .gitignore
 git -C "$seed" commit -qm initial
 git -C "$seed" remote add origin "$remote"
@@ -52,5 +52,10 @@ grep -q -- '-m pip install --disable-pip-version-check -r requirements.txt' "$tm
 grep -q '^restart looki-mcp.service$' "$tmp/systemctl.log"
 grep -q '^is-active --quiet looki-mcp.service$' "$tmp/systemctl.log"
 [[ "$(cat "$service/.deployed-sha")" == "$(git -C "$service" rev-parse HEAD)" ]]
+[[ -z "$(git -C "$service" status --porcelain)" ]]
+
+# The deploy stamp must not trip the dirty-tree guard on the next deployment.
+PATH="$bin:$PATH" LOOKI_MCP_SERVICE_DIR="$service" "$repo_root/scripts/deploy.sh" origin/main
+[[ -z "$(git -C "$service" status --porcelain)" ]]
 
 echo "looki deploy test: ok"
