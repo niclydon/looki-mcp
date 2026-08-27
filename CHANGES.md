@@ -3,6 +3,14 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-08-27 — Git-in-place production deploy path (OB-57276)
+
+Added `scripts/deploy.sh` for the Python service checkout: fetch and detach at
+an explicit ref, refuse local changes, install requirements through the
+existing venv, persist mode `750`, restart `looki-mcp.service`, and require the
+real `/health` JSON contract before stamping `.deployed-sha`. A hermetic shell
+test exercises the complete deployment sequence with fake systemd and HTTP.
+
 ## 2026-08-09 — systemd unit adoption, repo:=deployed (OB-53769)
 
 Adopted the deployed `/etc/systemd/system/looki-mcp.service` and
