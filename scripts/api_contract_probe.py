@@ -12,12 +12,20 @@ Live (needs LOOKI_BASE_URL + LOOKI_API_KEY in env or .env)::
     set -a; source .env; set +a
     .venv/bin/python scripts/api_contract_probe.py
 
-Never prints the API key. Keeps request count small (serial GETs).
+Never prints the API key. Keeps request count small (serial GETs, paced;
+well within the 60 req/min upstream budget).
 Exit 0 when skill is reachable and (if live) known paths respond with
 envelope code 0 (or expected validation failures for invalid enums).
 Exit 1 on hard regressions (auth fail, known path missing, invalid enum accepted).
 
 Baseline skill sha256 prefix at 2026-07-18 discovery: 4c5c991cb1165b91
+
+Re-baselined 2026-10-16 (OB-65518): /for_you/items was retired upstream
+(HTTP 400, envelope code 105) and is now asserted as deprecated instead of
+expected to succeed; the error-code vocabulary is 100 = invalid params,
+105 = deprecated endpoint, 106 = missing auth token; moment payloads are
+checked for the search_context field; the journal type vocabulary is the
+October 2026 observed set (unknown future types warn, never fail).
 """
 from __future__ import annotations
 
@@ -36,6 +44,9 @@ SKILL_URL = "https://web.looki.ai/agent/looki-memory/SKILL.md"
 BASELINE_SHA256_PREFIX = "4c5c991cb1165b91"
 
 # Known Open API paths from skill + live inventory (relative to LOOKI_BASE_URL).
+# /for_you/items is deliberately NOT here: upstream retired it (see
+# DEPRECATED_PATHS below, asserted separately so a revival or re-code of the
+# retirement is loud rather than silently absorbed).
 KNOWN_PATHS: list[tuple[str, dict | None]] = [
     ("/me", None),
     ("/moments/calendar", {"start_date": "2026-07-01", "end_date": "2026-07-07"}),
@@ -44,9 +55,45 @@ KNOWN_PATHS: list[tuple[str, dict | None]] = [
     ("/journals", {"max_days": "1"}),
     ("/journals/calendar", {"start_date": "2026-07-01", "end_date": "2026-07-07"}),
     ("/journals/by_date", {"on_date": "2026-07-01"}),
-    ("/for_you/items", {"limit": "1"}),
     ("/realtime/latest-event", None),
 ]
+
+# Retired paths and the exact retirement contract asserted for each:
+# HTTP 400 with envelope code 105 (deprecated endpoint).
+DEPRECATED_PATHS: list[tuple[str, dict | None]] = [
+    ("/for_you/items", {"limit": "1"}),
+]
+
+# Envelope error-code vocabulary (verified live 2026-10-16):
+#   0   = success
+#   100 = invalid params
+#   105 = deprecated endpoint
+#   106 = missing auth token
+CODE_INVALID_PARAMS = 100
+CODE_DEPRECATED_ENDPOINT = 105
+CODE_MISSING_AUTH_TOKEN = 106
+
+# Journal entry types observed live. July 2026 set: DIARY, YESTERDAY_RECAP,
+# DIETARY, AUDIO_SUMMARY, COMIC_PAGE, WEEKLY_JOURNAL, SYSTEM_POST (plus the
+# rarer STORYBOARD, DAILY_ROUTINE). Added in the October 2026 sample:
+# DAILY_HEALTH_REPORT, DAILY_VLOG, MANUAL_AUDIO_SUMMARY, PLOG (DAILY_VLOG
+# migrated from a for_you type to a journal type). Unknown types observed in
+# the future are warnings, not failures: upstream grows this vocabulary.
+KNOWN_JOURNAL_TYPES = frozenset({
+    "DIARY",
+    "YESTERDAY_RECAP",
+    "DIETARY",
+    "AUDIO_SUMMARY",
+    "MANUAL_AUDIO_SUMMARY",
+    "COMIC_PAGE",
+    "WEEKLY_JOURNAL",
+    "SYSTEM_POST",
+    "STORYBOARD",
+    "DAILY_ROUTINE",
+    "DAILY_HEALTH_REPORT",
+    "DAILY_VLOG",
+    "PLOG",
+})
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -78,74 +125,137 @@ def skill_paths(skill_text: str) -> list[str]:
     return found
 
 
-def probe_live(base_url: str, api_key: str) -> list[str]:
-    """Return list of failure messages (empty == success)."""
+def _body_and_code(r: httpx.Response) -> tuple[dict, object]:
+    try:
+        body = r.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    return body, body.get("code")
+
+
+def probe_live(base_url: str, api_key: str) -> tuple[list[str], int]:
+    """Return (failure messages, live request count). Empty failures == success."""
     failures: list[str] = []
+    stats = {"requests": 0}
+
+    def get(client: httpx.Client, url: str, **kwargs) -> httpx.Response:
+        # Serial + paced: one request at a time, 0.15s between calls, so the
+        # whole probe stays far inside the 60 req/min upstream budget.
+        stats["requests"] += 1
+        resp = client.get(url, **kwargs)
+        time.sleep(0.15)
+        return resp
+
     headers = {"X-API-Key": api_key, "Accept": "application/json"}
     base = base_url.rstrip("/")
     with httpx.Client(timeout=20.0, headers=headers) as client:
         print("=== known path matrix ===")
         for path, params in KNOWN_PATHS:
-            r = client.get(base + path, params=params)
-            try:
-                body = r.json()
-            except Exception:
-                body = {}
-            code = body.get("code") if isinstance(body, dict) else None
+            r = get(client, base + path, params=params)
+            body, code = _body_and_code(r)
             ok = r.status_code == 200 and code == 0
             flag = "OK" if ok else "FAIL"
             print(f"  {flag} {r.status_code} env={code} {path}")
             if not ok:
                 failures.append(f"known path failed: {path} status={r.status_code} code={code}")
-            time.sleep(0.15)
+
+        print("=== deprecation assertions (retired paths) ===")
+        for path, params in DEPRECATED_PATHS:
+            r = get(client, base + path, params=params)
+            body, code = _body_and_code(r)
+            if r.status_code == 400 and code == CODE_DEPRECATED_ENDPOINT:
+                print(f"  OK {path} retired: HTTP 400 env={code} (deprecated endpoint)")
+            else:
+                failures.append(
+                    f"deprecated path contract changed: {path} expected HTTP 400 "
+                    f"code={CODE_DEPRECATED_ENDPOINT}, got status={r.status_code} code={code}"
+                )
+                print(
+                    f"  FAIL {path} expected HTTP 400 code={CODE_DEPRECATED_ENDPOINT}, "
+                    f"got status={r.status_code} code={code}"
+                )
+
+        print("=== auth contract check ===")
+        with httpx.Client(timeout=20.0, headers={"Accept": "application/json"}) as anon:
+            r = get(anon, base + "/me")
+            body, code = _body_and_code(r)
+            if code == CODE_MISSING_AUTH_TOKEN:
+                print(f"  OK no-key /me rejected code={code} (missing auth token)")
+            else:
+                failures.append(
+                    f"no-key /me should return code={CODE_MISSING_AUTH_TOKEN} "
+                    f"(missing auth token), got status={r.status_code} code={code}"
+                )
+                print(
+                    f"  FAIL no-key /me expected code={CODE_MISSING_AUTH_TOKEN}, "
+                    f"got status={r.status_code} code={code}"
+                )
 
         print("=== enum contract checks ===")
-        # Invalid group must fail
-        r = client.get(base + "/for_you/items", params={"limit": 1, "group": "comic"})
-        body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
-        code = body.get("code") if isinstance(body, dict) else None
+        # Uppercase sort_order must fail as invalid params (code 100)
+        r = get(client, base + "/journals", params={"max_days": 1, "sort_order": "ASC"})
+        body, code = _body_and_code(r)
         if code == 0:
-            failures.append("expected group=comic to fail, got code=0")
-            print("  FAIL group=comic accepted")
-        else:
-            print(f"  OK group=comic rejected code={code}")
-        time.sleep(0.15)
-
-        r = client.get(base + "/for_you/items", params={"limit": 1, "group": "vlog"})
-        body = r.json()
-        if body.get("code") != 0:
-            failures.append(f"group=vlog should succeed, code={body.get('code')}")
-            print(f"  FAIL group=vlog code={body.get('code')}")
-        else:
-            print("  OK group=vlog")
-        time.sleep(0.15)
-
-        # Uppercase sort_order must fail
-        r = client.get(base + "/journals", params={"max_days": 1, "sort_order": "ASC"})
-        body = r.json()
-        if body.get("code") == 0:
             failures.append("expected sort_order=ASC to fail, got code=0")
             print("  FAIL sort_order=ASC accepted")
+        elif code != CODE_INVALID_PARAMS:
+            failures.append(
+                f"sort_order=ASC should fail with code={CODE_INVALID_PARAMS} "
+                f"(invalid params), got code={code}"
+            )
+            print(f"  FAIL sort_order=ASC rejected with unexpected code={code}")
         else:
-            print(f"  OK sort_order=ASC rejected code={body.get('code')}")
-        time.sleep(0.15)
+            print(f"  OK sort_order=ASC rejected code={code} (invalid params)")
 
-        r = client.get(base + "/journals", params={"max_days": 1, "sort_order": "asc"})
-        body = r.json()
-        if body.get("code") != 0:
-            failures.append(f"sort_order=asc should succeed, code={body.get('code')}")
-            print(f"  FAIL sort_order=asc code={body.get('code')}")
+        r = get(client, base + "/journals", params={"max_days": 1, "sort_order": "asc"})
+        body, code = _body_and_code(r)
+        if code != 0:
+            failures.append(f"sort_order=asc should succeed, code={code}")
+            print(f"  FAIL sort_order=asc code={code}")
         else:
             print("  OK sort_order=asc")
-        time.sleep(0.15)
 
-        # FileModel metadata nesting sample
-        r = client.get(base + "/moments", params={"on_date": "2026-07-01"})
-        body = r.json()
+        print("=== journal type vocabulary ===")
+        r = get(client, base + "/journals", params={"max_days": 7})
+        body, code = _body_and_code(r)
+        seen_types: set[str] = set()
+        data = body.get("data") if isinstance(body, dict) else None
+        if isinstance(data, dict):
+            # /journals wraps its day buckets in a paginated items envelope.
+            data = data.get("items")
+        if isinstance(data, list):
+            for bucket in data:
+                if not isinstance(bucket, dict):
+                    continue
+                entries = bucket.get("journals")
+                if not isinstance(entries, list):
+                    entries = [bucket]
+                for entry in entries:
+                    if isinstance(entry, dict) and entry.get("type"):
+                        seen_types.add(str(entry["type"]))
+        if seen_types:
+            print(f"  journal types seen ({len(seen_types)}): {sorted(seen_types)}")
+            for t in sorted(seen_types - KNOWN_JOURNAL_TYPES):
+                # New upstream types are expected over time: warn, do not fail.
+                print(f"  WARN: unknown journal type {t} (not in October 2026 vocabulary)")
+        else:
+            print("  WARN: no journal entries in sample window for type vocabulary check")
+
+        print("=== moment shape checks ===")
+        # FileModel metadata nesting sample + search_context presence
+        r = get(client, base + "/moments", params={"on_date": "2026-07-01"})
+        body, code = _body_and_code(r)
         moments = body.get("data") if isinstance(body, dict) else None
         if isinstance(moments, list) and moments:
+            if "search_context" in moments[0]:
+                print("  OK moment payload carries search_context")
+            else:
+                failures.append("moment payload missing search_context field")
+                print("  FAIL moment payload missing search_context field")
             mid = moments[0].get("id")
-            r = client.get(f"{base}/moments/{mid}/files", params={"limit": 2})
+            r = get(client, f"{base}/moments/{mid}/files", params={"limit": 2})
             data = r.json().get("data") or {}
             items = data.get("items") or []
             if items:
@@ -161,9 +271,9 @@ def probe_live(base_url: str, api_key: str) -> list[str]:
             else:
                 print("  WARN: no files for sample moment")
         else:
-            print("  WARN: no moments for FileModel sample date")
+            print("  WARN: no moments for FileModel/search_context sample date")
 
-    return failures
+    return failures, stats["requests"]
 
 
 def main() -> int:
@@ -211,7 +321,10 @@ def main() -> int:
         return 0
 
     print(f"=== live base: {base} (key length={len(key)}, not printed) ===")
-    failures = probe_live(base, key)
+    started = time.monotonic()
+    failures, n_requests = probe_live(base, key)
+    elapsed = time.monotonic() - started
+    print(f"=== live probe: {n_requests} requests in {elapsed:.1f}s (serial, paced) ===")
     if failures:
         print("=== FAILURES ===")
         for f in failures:
