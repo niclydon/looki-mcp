@@ -3,6 +3,65 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-10-16 — Looki API parity (RP-80): the `/for_you` retirement
+
+The October parity audit found the inverse of July's RP-57 drift: the
+endpoints did not move, one of them **ceased to exist**. Looki retired
+`GET /for_you/items`, breaking `get_highlights`, its only consumer, while
+Looki's own agent skill doc stayed byte-identical to the July baseline and
+still documents the endpoint as live. Filed as ProjectManager track
+**RP-80** (`looki-mcp-api-parity-2026-10`), run-pack
+`rp-2026-10-16-looki-api-parity`, three OBs **65516–65518**, all closed.
+
+**Discovery.** All 24 tools audited against the live API
+(`https://open.looki.ai/api/v1`, ~50 serial probes from furnace, inside the
+60 req/min budget). Skill doc sha256
+`4c5c991cb1165b910c6cd4d95ff20d4dc1f717678233a6a27a9d30421387f939` —
+unchanged since 2026-07-18; no OpenAPI surface (probed paths 404).
+`/for_you/items` returns HTTP 400, envelope code 105: "This endpoint is
+deprecated. Please use GET /journals instead." Also found: moment payloads
+gained `search_context`; journal types expanded (`DAILY_HEALTH_REPORT`,
+`DAILY_VLOG`, `MANUAL_AUDIO_SUMMARY`, `PLOG`; `DAILY_VLOG` migrated from a
+for_you type to a journal type); new error codes 105 (deprecated endpoint)
+and 106 (missing auth token); journal `content` key present on text types,
+omitted on media types; `/journals` `type`/`group` params silently ignored
+upstream.
+
+**P0 fix (OB-65516).** `get_highlights` re-implemented as a client-side
+composite over `GET /journals` (detail in the entry below). PR #5, squash
+merge `cf79a8cd1864178c6553d6997dbd7097c3e9e7b0`; deployed via
+`scripts/deploy.sh` (`.deployed-sha` = `cf79a8c`, health ok). Live smoke:
+limit 5 returned 5 items (`COMIC_PAGE` ×3, `DAILY_VLOG` ×2, 2026-10-15/14/13),
+source `"journals"`, `scanned_entries` 250, `has_more` true, no deprecation
+error. Offline suite 14 of 15 PASS (`test_all_tools.py` skipped, live
+harness).
+
+**P1 docs (OB-65517).** `looki_mcp/models.py` + `journals_api_findings.md`
+refreshed to the October 2026 contract, re-stamped "verified 2026-10-16":
+retirement recorded (400/code 105), `search_context`, four new journal
+types, error codes 100/105/106, content/thumbnail omission nuances,
+observed `/me` key set. PR #6, squash merge
+`b2b3d51796eeb0bc3e0d95a0fddeab22dc8419c1`. Docs-only, no deploy.
+
+**P1 harness (OB-65518).** `scripts/api_contract_probe.py` re-baselined:
+`/for_you/items` out of `KNOWN_PATHS` success expectations and now asserted
+retired (400/code 105), so a revival trips the harness; error-code
+vocabulary pinned (100/105/106); `search_context` shape check added;
+journal vocabulary refreshed, unknown future types warn rather than fail.
+Validated both ways: green run exit 0 (15 requests in 18.1s, serial paced;
+all 8 known paths envelope 0; no-key `/me` code 106; `sort_order=ASC` code
+100), flipped-expectation run exit 1 naming the mismatch. PR #7, squash
+merge `43f0a003475fe043a959805bc7825b528ea39bba`. Script-only, no deploy.
+
+**State at close.** All 24 tools healthy against the live contract; the one
+user-visible break fixed and deployed; deployed service remains at
+`cf79a8c` (the arc's only code change — the docs and probe merges do not
+redeploy). **Pending:** upstream's skill doc still documents the retired
+endpoint; that lag is Looki's, recorded here and in the contract docs, and
+the probe's skill-hash baseline will show when upstream next revises it.
+
+Full story: `docs/narrative/2026-10-16-api-contract-parity-rp80.md`
+
 ## 2026-10-16 — get_highlights re-implemented as a journals composite (OB-65516)
 
 Looki retired `GET /for_you/items` (HTTP 400, envelope code 105), so
