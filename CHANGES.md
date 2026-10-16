@@ -3,6 +3,20 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-10-16 — get_highlights re-implemented as a journals composite (OB-65516)
+
+Looki retired `GET /for_you/items` (HTTP 400, envelope code 105), so
+`get_highlights` now derives highlights client-side from `GET /journals`:
+it scans journal pages through `client.governed_get` (bounded at 6 pages /
+93 days), filters to the journal types `DAILY_VLOG`, `COMIC_PAGE`, and
+`PLOG` (a module-level constant; the mapping is inferred from the observed
+October 2026 journal vocabulary, not upstream docs), and returns them
+newest first in the previous envelope shape. The retired endpoint's
+group/order validators and the `scripts/test_highlights_group.py` coverage
+were removed; `scripts/test_highlights.py` covers the type filter, limit,
+ordering, date windows, dedupe, and envelope shape with recorded-shape
+journal fixtures.
+
 ## 2026-08-27 — Git-in-place production deploy path (OB-57276)
 
 Added `scripts/deploy.sh` for the Python service checkout: fetch and detach at
