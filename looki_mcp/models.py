@@ -7,9 +7,18 @@ unmodified, so model drift never breaks tool behavior; it only affects how
 accurately the docs match reality.
 
 All shapes below have been re-verified against the live Looki Open API as of
-**2026-07-18** (moments / highlights / profile / realtime / journals / FileModel
-metadata nesting). Earlier bulk checks: 2026-04-29 (moments/highlights/profile/
-realtime) and 2026-06-20 (journals feed).
+**2026-10-16** (moments / profile / realtime / journals / FileModel metadata
+nesting; the retired /for_you/items endpoint - see the retired-endpoint note
+below). Earlier bulk checks: 2026-04-29 (moments/highlights/profile/
+realtime), 2026-06-20 (journals feed), and 2026-07-18 (moments / highlights /
+profile / realtime / journals).
+
+Verification basis (2026-10-16): live probes from furnace against the live
+API. The upstream agent skill doc
+(https://web.looki.ai/agent/looki-memory/SKILL.md) is unchanged since July -
+sha256 4c5c991cb1165b910c6cd4d95ff20d4dc1f717678233a6a27a9d30421387f939 -
+and still presents /for_you/items as live, which is why this in-repo contract
+carries the correction.
 
 The Looki API wraps every response in `{code, detail, data}`; our `unwrap()`
 helper strips that envelope, so the models below describe the *unwrapped* `data`
@@ -28,7 +37,11 @@ from pydantic import BaseModel
 
 class ProfileResponse(BaseModel):
     """Returned by GET /me. Note: the actual data lives at `envelope.data.user`.
-    Our get_profile tool surfaces the inner `user` object directly."""
+    Our get_profile tool surfaces the inner `user` object directly.
+
+    Observed /me key set (live, 2026-10-16): birthday, first_name, gender,
+    id, last_name, tz. email / region / kind were absent on the observed
+    payload (they remain optional below)."""
 
     id: str
     first_name: str
@@ -51,7 +64,7 @@ class FileMetadata(BaseModel):
 
 class FileModel(BaseModel):
     """Underlying media file. Lives inside MomentFileModel.file, journal media,
-    for_you cover/file, and realtime latest_file.
+    and realtime latest_file.
 
     **2026-07 live shape:** duration and dimensions live under `metadata`.
     Top-level `size` / `duration_ms` are legacy fallbacks (not present on current
@@ -95,7 +108,11 @@ class MomentModel(BaseModel):
     """A captured memory. Returned by /moments, /moments/{id}, /moments/search items.
 
     `cover_file` is structurally a MomentFileModel (wraps a FileModel under .file),
-    not a bare FileModel."""
+    not a bare FileModel.
+
+    Moment payloads observed live on 2026-10-16 (list, detail, search, and
+    calendar highlight) also carry a `search_context` field - see the field
+    note below."""
 
     id: str  # UUID
     title: str
@@ -106,6 +123,11 @@ class MomentModel(BaseModel):
     tz: str | None = None
     start_time: str
     end_time: str
+    # Observed live 2026-10-16 on moment list, detail, search, and calendar
+    # highlight payloads; absent from this model before the 2026-10-16 audit.
+    # Undocumented upstream; shape not yet characterized, so it is documented
+    # here as an optional pass-through only (no parsing / validation).
+    search_context: object | None = None
 
 
 class CalendarDayModel(BaseModel):
@@ -120,11 +142,14 @@ class CalendarDayModel(BaseModel):
 # /moments?on_date=...   returns: list[MomentModel]
 # /moments/{id}/files    returns: {"items": list[MomentFileModel], next_cursor_id, has_more}
 # /moments/search        returns: {"items": list[MomentModel], has_more}  (page-based)
-# /for_you/items         returns: {"items": list[ForYouItemModel], next_cursor_id, has_more}
+# RETIRED: /for_you/items - do NOT call. Live probe on 2026-10-16 returned
+# HTTP 400 with envelope code 105 (deprecated endpoint); the upstream detail
+# points to GET /journals instead. ForYouItemModel / HighlightsResponse below
+# are kept only as a historical record of the retired payload shape.
 
 
 class PaginatedItems(BaseModel):
-    """Generic shape used by /moments/{id}/files, /moments/search, /for_you/items.
+    """Generic shape used by /moments/{id}/files and /moments/search.
 
     The `items` field's element type varies by endpoint — see the specific
     XxxItemsResponse aliases below for precise typing."""
@@ -148,12 +173,23 @@ class SearchMomentsResponse(BaseModel):
 
 
 class ForYouItemModel(BaseModel):
-    """AI-generated highlight content. The `type` field uses uppercase API codes.
+    """HISTORICAL ONLY - payload of the RETIRED GET /for_you/items endpoint.
+
+    Retired: a live probe on 2026-10-16 returned HTTP 400 with envelope
+    code 105 (deprecated endpoint), and the upstream detail points to
+    GET /journals instead. Do not call /for_you/items. This model is kept
+    only as a record of the retired payload shape; highlights are now
+    derived client-side from the journals feed.
+
+    AI-generated highlight content. The `type` field used uppercase API codes.
 
     Observed types (2026-07): DAILY_VLOG, USER_VLOG, MOMENT_POST, IMAGE_POST,
-    IMAGE_POST_WEEKLY_LIFE_COLORS, USER_EVENT_ANALYSIS.
+    IMAGE_POST_WEEKLY_LIFE_COLORS, USER_EVENT_ANALYSIS. Note: DAILY_VLOG has
+    since migrated from a for_you type to a journal type (observed live as a
+    journal type in the 2026-10-16 sample; see JournalEntryModel).
 
-    Query `group` filter (live): **all | vlog | other** only — not comic/present.
+    Query `group` filter (when the endpoint was live): **all | vlog | other**
+    only - not comic/present.
     """
 
     id: str
@@ -168,6 +204,9 @@ class ForYouItemModel(BaseModel):
 
 
 class HighlightsResponse(BaseModel):
+    """HISTORICAL ONLY - response shape of the retired /for_you/items endpoint
+    (retired 2026-10-16; HTTP 400, envelope code 105). See ForYouItemModel."""
+
     items: list[ForYouItemModel]
     next_cursor_id: str | None = None
     has_more: bool | None = None
@@ -208,6 +247,9 @@ class JournalMediaItem(BaseModel):
     encodes provenance under /processed/{category}/..."""
 
     source: JournalMediaFile
+    # Serialization nuance (live, 2026-10-16): `thumbnail` was present only on
+    # DAILY_VLOG media items in the observed sample; on other journal types
+    # the key is omitted entirely rather than sent as null.
     thumbnail: JournalMediaFile | None = None
 
 
@@ -218,13 +260,22 @@ class JournalEntryModel(BaseModel):
     Types observed 2026-07: DIARY, YESTERDAY_RECAP, DIETARY, AUDIO_SUMMARY,
     COMIC_PAGE, WEEKLY_JOURNAL, SYSTEM_POST.
     Earlier observations also included STORYBOARD, DAILY_ROUTINE (may be rare).
+
+    Types added 2026-10-16 (observed live in a 14-day, 119-entry sample):
+    DAILY_HEALTH_REPORT, DAILY_VLOG, MANUAL_AUDIO_SUMMARY, PLOG.
+    DAILY_VLOG migrated from a for_you type to a journal type.
+
+    Serialization nuance (live, 2026-10-16): the `content` key is present
+    and non-null on text types (DIARY, YESTERDAY_RECAP, AUDIO_SUMMARY,
+    MANUAL_AUDIO_SUMMARY) and omitted entirely on media types (COMIC_PAGE,
+    DAILY_VLOG, DAILY_HEALTH_REPORT, PLOG) - omitted, not null.
     """
 
     id: str  # UUID — use with /journals/{id}
     type: str
     title: str | None = None  # null on DIARY / YESTERDAY_RECAP
     description: str
-    content: str | None = None
+    content: str | None = None  # see docstring: omitted entirely on media types
     media_items: list[JournalMediaItem] = []
     date: str  # YYYY-MM-DD
     start_date: str | None = None  # range start for multi-day types
@@ -280,7 +331,12 @@ class VerifyResponse(BaseModel):
 class LookiResponseEnvelope(BaseModel):
     """Every authenticated Looki API call (i.e. base_url + /me, /moments, etc.)
     wraps its payload in this envelope. `client.unwrap()` strips this layer
-    automatically so tools see only the inner `data` value."""
+    automatically so tools see only the inner `data` value.
+
+    Error-code vocabulary (envelope `code`, verified 2026-10-16):
+    0 = success; 100 = invalid params (unchanged); 105 = deprecated
+    endpoint (new - returned for the retired /for_you/items, HTTP 400);
+    106 = missing auth token (new)."""
 
     code: int  # 0 == success, non-zero == error
     detail: str  # "OK" on success, error description otherwise
