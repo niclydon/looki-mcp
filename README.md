@@ -4,6 +4,11 @@ An MCP (Model Context Protocol) server for the [Looki](https://web.looki.ai) wea
 camera — giving Claude, ChatGPT, and other AI assistants access to your personal
 memories, moments, photos, AI-generated highlights, and written journal entries.
 
+> **October 2026 upstream change:** Looki retired `GET /for_you/items` (it now returns
+> HTTP 400, envelope code 105). On 2026-10-16 `get_highlights` was rebuilt on top of
+> `GET /journals`. If you deployed before then, pull and restart; older copies return
+> errors from `get_highlights`. Details in [CHANGES.md](./CHANGES.md).
+
 ## What It Does
 
 Looki L1 is a wearable camera that passively captures your daily life. This MCP server
@@ -33,7 +38,7 @@ exposes your Looki data through 24 tools that AI assistants can use to answer qu
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/looki-mcp.git
+git clone https://github.com/niclydon/looki-mcp.git
 cd looki-mcp
 python3 -m venv .venv
 source .venv/bin/activate
@@ -130,8 +135,8 @@ openssl rand -hex 32
 }
 ```
 
-In claude.ai's Integrations UI, add the same header field when configuring
-the MCP server.
+In claude.ai, add it under **Request headers** when you add the custom connector
+(`x-origin-secret` as the name, your secret as the value).
 
 **What's exempt:** `/health` (so monitoring still works) and `/logo.ico` (so
 MCP clients can fetch the icon during pre-session metadata exchange).
@@ -288,9 +293,13 @@ error message explaining what to fix.
 
 ### claude.ai
 
-1. Go to **Settings → Integrations → Add MCP Server**
-2. Enter your server URL: `https://your-server.example.com/mcp`
-3. The Looki logo will appear if `LOOKI_MCP_BASE_URL` is set
+1. Go to **Customize → Connectors**, click **+ Add**, then **Add custom connector**
+2. Enter a name and your server URL: `https://your-server.example.com/mcp`
+3. If you set `ORIGIN_SHARED_SECRET`, add `x-origin-secret` under **Request headers**
+4. Choose **No sign in** unless you've put an OAuth front door in front of the server
+5. The Looki logo will appear if `LOOKI_MCP_BASE_URL` is set
+
+Team and Enterprise owners add custom connectors under **Organization settings → Connectors**.
 
 ### Claude Desktop (remote HTTP)
 
@@ -320,7 +329,7 @@ account, and a `.venv` virtualenv inside that directory; adjust the paths and
 sudo useradd --system --create-home --shell /usr/sbin/nologin looki || true
 sudo mkdir -p /opt/looki-mcp
 sudo chown looki:looki /opt/looki-mcp
-git clone https://github.com/yourusername/looki-mcp /opt/looki-mcp
+git clone https://github.com/niclydon/looki-mcp /opt/looki-mcp
 cd /opt/looki-mcp
 
 # Set up venv + deps
@@ -367,7 +376,7 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `get_moment_details` | Full details for one moment | `moment_id` |
 | `get_moment_files` | Photos/videos from a moment | `moment_id`, `highlight`, `limit` |
 | `search_moments` | Natural language memory search | `query`, `start_date`, `end_date` |
-| `get_highlights` | AI-generated highlights (comics, vlogs) | `group`, `liked`, `limit` |
+| `get_highlights` | AI-generated highlights (daily vlogs, comic pages, photo logs), derived from journals; scans up to 93 days per call | `limit`, `cursor_id`, `recorded_from`, `recorded_to` |
 | `get_realtime_event` | Current real-time detection (beta) | — |
 | `describe_realtime_event` | Latest realtime + optional Forge VLM one-sentence visual description (if snapshot + Forge configured) | — |
 | `get_recent_activity` | Calendar summary for last N days | `days` |
@@ -402,7 +411,7 @@ the server works unchanged.
 
 ```
 GET /health
-{"status":"ok","server":"looki-mcp","version":"1.0.0","tools":24}
+{"status":"ok","server":"looki-mcp","version":"1.1.0","tools":24}
 ```
 
 Useful for Docker healthchecks, load balancers, and uptime monitoring.

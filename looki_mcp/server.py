@@ -50,7 +50,7 @@ _icons: list[Icon] | None = (
 
 mcp = FastMCP(
     name="looki-mcp",
-    version="1.0.0",
+    version="1.1.0",
     website_url="https://web.looki.ai",
     icons=_icons,
     instructions=(
@@ -83,7 +83,7 @@ async def health(request) -> JSONResponse:  # type: ignore[no-untyped-def]
         {
             "status": "ok",
             "server": "looki-mcp",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "tools": TOOL_COUNT,
         }
     )
