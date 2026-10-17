@@ -27,6 +27,10 @@ mkdir -p "$service/.venv/bin"
 cat > "$service/.venv/bin/python" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$tmp/python.log"
+case "\$*" in
+  *"pip check"*) [[ -z "\${FAIL_PIP_CHECK:-}" ]] ;;
+  "-c import main") [[ -z "\${FAIL_IMPORT:-}" ]] ;;
+esac
 EOF
 chmod +x "$service/.venv/bin/python"
 printf 'LOOKI_PORT=7861\n' > "$service/.env"
@@ -49,6 +53,8 @@ PATH="$bin:$PATH" LOOKI_MCP_SERVICE_DIR="$service" "$repo_root/scripts/deploy.sh
 
 [[ "$(stat -c '%a' "$service")" == "750" ]]
 grep -q -- '-m pip install --disable-pip-version-check -r requirements.txt' "$tmp/python.log"
+grep -q -- '-m pip check --disable-pip-version-check' "$tmp/python.log"
+grep -qx -- '-c import main' "$tmp/python.log"
 grep -q '^restart looki-mcp.service$' "$tmp/systemctl.log"
 grep -q '^is-active --quiet looki-mcp.service$' "$tmp/systemctl.log"
 [[ "$(cat "$service/.deployed-sha")" == "$(git -C "$service" rev-parse HEAD)" ]]
@@ -57,5 +63,18 @@ grep -q '^is-active --quiet looki-mcp.service$' "$tmp/systemctl.log"
 # The deploy stamp must not trip the dirty-tree guard on the next deployment.
 PATH="$bin:$PATH" LOOKI_MCP_SERVICE_DIR="$service" "$repo_root/scripts/deploy.sh" origin/main
 [[ -z "$(git -C "$service" status --porcelain)" ]]
+
+# OB-65573: a venv that fails pip check or cannot import main.py aborts the
+# deploy before the restart, so the old process keeps serving.
+for failure in FAIL_IMPORT FAIL_PIP_CHECK; do
+  : > "$tmp/systemctl.log"
+  if env "$failure=1" PATH="$bin:$PATH" LOOKI_MCP_SERVICE_DIR="$service" \
+      "$repo_root/scripts/deploy.sh" origin/main 2> "$tmp/deploy.err"; then
+    echo "deploy succeeded with $failure" >&2
+    exit 1
+  fi
+  grep -q 'was not restarted' "$tmp/deploy.err"
+  [[ ! -s "$tmp/systemctl.log" ]] || { echo "systemctl ran despite $failure" >&2; exit 1; }
+done
 
 echo "looki deploy test: ok"

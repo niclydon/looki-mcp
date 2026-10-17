@@ -26,6 +26,15 @@ log "checked out $SHA"
 log "installing Python requirements"
 "$SERVICE_DIR/.venv/bin/python" -m pip install --disable-pip-version-check -r requirements.txt
 
+# Check the installed venv before touching the running service: an in-place
+# upgrade can leave a package unimportable (fastmcp 3.x -> 4.x split, OB-65573),
+# and restarting onto it is downtime. On failure the old process keeps serving.
+log "checking installed requirements and the service import"
+"$SERVICE_DIR/.venv/bin/python" -m pip check --disable-pip-version-check \
+  || die "pip check failed; $SERVICE_UNIT was not restarted"
+"$SERVICE_DIR/.venv/bin/python" -c 'import main' \
+  || die "main.py does not import in the service venv; $SERVICE_UNIT was not restarted"
+
 # Persist the least-privilege mode required by the service owner. Files below
 # the directory keep their existing executable/readability modes.
 chmod 750 "$SERVICE_DIR"
