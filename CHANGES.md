@@ -3,6 +3,18 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-10-24 — OB-68283 restart-policy drop-in matches the canonical template
+
+`systemd/looki-mcp.service.d/restart-policy.conf` still carried the 2026-08
+policy: `StartLimitBurst=20`, `StartLimitIntervalSec=900`, `RestartSec=15`. The
+fleet now uses the homelab canonical MCP policy
+(`services/systemd/mcp-restart-policy.conf`, OB-65593): no start limit, and an
+exponential backoff from 5s up to 300s. Furnace already runs that policy, so
+re-running `scripts/install-systemd.sh` would have silently rolled it back to
+the finite window. The unit file's own `StartLimitIntervalSec=0` already matches
+and is unchanged. No live change and no restart. Sibling of twilio-mcp's
+OB-65595 slice.
+
 ## 2026-10-16 — Looki API parity (RP-80): the `/for_you` retirement
 
 The October parity audit found the inverse of July's RP-57 drift: the
