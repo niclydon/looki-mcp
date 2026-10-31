@@ -48,3 +48,27 @@ class OriginSecretMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
 
         return await call_next(request)
+
+
+class RootMcpAliasMiddleware:
+    """Rewrites the exact root path "/" to "/mcp" before routing.
+
+    The consolidated AS declares two resources for looki-mcp (the root
+    resource and the /mcp alias) and the gateway's RS migration
+    dispatches each audience to its own path. FastMCP serves the
+    protocol only at /mcp, so without this alias a root-audience
+    request would pass the origin-secret guard and then 404. Only the
+    exact root path is rewritten; every other path passes through
+    untouched. This middleware sits OUTSIDE the origin-secret check,
+    and the rewritten path is not exempt, so aliased requests are
+    still guarded. Pure ASGI (no BaseHTTPMiddleware) so the request
+    body streams through unbuffered, as the MCP transport expects.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send):  # type: ignore[no-untyped-def]
+        if scope["type"] == "http" and scope.get("path") == "/":
+            scope = {**scope, "path": "/mcp", "raw_path": b"/mcp"}
+        await self.app(scope, receive, send)

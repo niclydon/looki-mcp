@@ -3,6 +3,19 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-10-31 — OB-68522 Phase 6: root-path alias for the MCP endpoint
+
+New `RootMcpAliasMiddleware` (looki_mcp/middleware.py), registered
+first in the ASGI stack in main.py: it rewrites the exact root path
+"/" to "/mcp" before routing. The consolidated AS declares two
+resources for looki-mcp (root and /mcp alias) and the gateway's RS
+migration dispatches each audience to its own path; FastMCP serves
+the protocol only at /mcp, so root-audience requests previously
+passed the origin-secret guard and then 404'd. The /mcp path itself
+is untouched, the alias is not guard-exempt (aliased requests still
+need the origin secret), and /health and /logo.ico keep their
+existing routes and exemptions.
+
 ## 2026-10-24 — OB-68283 restart-policy drop-in matches the canonical template
 
 `systemd/looki-mcp.service.d/restart-policy.conf` still carried the 2026-08

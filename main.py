@@ -13,7 +13,7 @@ import sys
 from starlette.middleware import Middleware
 
 from looki_mcp.config import Config, load_and_validate_config
-from looki_mcp.middleware import OriginSecretMiddleware
+from looki_mcp.middleware import OriginSecretMiddleware, RootMcpAliasMiddleware
 from looki_mcp.server import TOOL_COUNT, mcp
 
 
@@ -70,8 +70,12 @@ def run() -> None:
         uvicorn_config["ssl_certfile"] = config.tls_cert_path
         uvicorn_config["ssl_keyfile"] = config.tls_key_path
 
-    # Build ASGI middleware stack. Currently just origin-secret enforcement when configured.
-    middleware: list[Middleware] = []
+    # Build ASGI middleware stack. The root alias runs first (outermost):
+    # it rewrites the exact root path to /mcp before routing, so the
+    # gateway's root resource serves the protocol (OB-68522 Phase 6).
+    # Origin-secret enforcement follows when configured; the rewritten
+    # path is not exempt, so aliased requests are still guarded.
+    middleware: list[Middleware] = [Middleware(RootMcpAliasMiddleware)]
     if config.origin_shared_secret:
         middleware.append(
             Middleware(OriginSecretMiddleware, secret=config.origin_shared_secret)
