@@ -126,31 +126,34 @@ async def load_and_validate_config() -> Config:
         print(f"looki-mcp: LOOKI_TLS_KEY_PATH '{tls_key_path}' does not exist or is not a file.", file=sys.stderr)
         sys.exit(1)
 
-    print("looki-mcp: Verifying Looki base URL...", flush=True)
-    verify_url = f"https://open.looki.ai/api/v1/verify?endpoint={base_url}"
+    print("looki-mcp: Verifying Looki API access...", flush=True)
+    # Looki retired the open.looki.ai/api/v1/verify helper endpoint (it now
+    # returns 404 for every caller), so verify against the real API instead:
+    # GET {base_url}/me with the account key, exactly as the client calls it.
+    verify_url = f"{base_url.rstrip('/')}/me"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(verify_url)
+            response = await client.get(verify_url, headers={"X-API-Key": api_key})
             response.raise_for_status()
             data = response.json()
-            # Success response: {"status": "ok"}
-            if data.get("status") != "ok":
+            # Success envelope: {"code": 0, "detail": "OK", "data": {...}}
+            if data.get("code") != 0:
                 detail = data.get("detail") or data.get("message") or "endpoint not accepted"
-                print(f"looki-mcp: Base URL verification failed: {detail}", file=sys.stderr)
-                print("  Check that LOOKI_BASE_URL matches exactly what the Looki app shows.", file=sys.stderr)
+                print(f"looki-mcp: Looki API verification failed: {detail}", file=sys.stderr)
+                print("  Check that LOOKI_BASE_URL and LOOKI_API_KEY match what the Looki app shows.", file=sys.stderr)
                 sys.exit(1)
     except httpx.HTTPStatusError as exc:
-        # Failure responses look like: 403 {"code":104,"detail":"domain not allowed",...}
+        # Failure responses look like: 401 {"code":106,"detail":"Invalid token",...}
         try:
             err_body = exc.response.json()
             detail = err_body.get("detail") or err_body.get("message") or "rejected"
         except Exception:
             detail = exc.response.text[:120] or "rejected"
-        print(f"looki-mcp: Base URL rejected by Looki (HTTP {exc.response.status_code}): {detail}", file=sys.stderr)
-        print("  Check your LOOKI_BASE_URL value.", file=sys.stderr)
+        print(f"looki-mcp: Looki API rejected the check (HTTP {exc.response.status_code}): {detail}", file=sys.stderr)
+        print("  Check your LOOKI_BASE_URL and LOOKI_API_KEY values.", file=sys.stderr)
         sys.exit(1)
     except httpx.RequestError as exc:
-        print(f"looki-mcp: Could not reach Looki verification endpoint: {exc}", file=sys.stderr)
+        print(f"looki-mcp: Could not reach the Looki API: {exc}", file=sys.stderr)
         print("  Check your internet connection and try again.", file=sys.stderr)
         sys.exit(1)
 

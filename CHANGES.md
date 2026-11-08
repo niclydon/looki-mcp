@@ -3,6 +3,17 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-08 — Startup verification via /me (OB-69561)
+
+Looki retired the `open.looki.ai/api/v1/verify` helper endpoint: it now
+returns 404 for every caller, so `load_and_validate_config` treated a
+healthy base URL and key as rejected and the server crash-looped on
+startup (466 restarts on the Furnace deployment). The verifier now checks
+the real API instead: `GET {LOOKI_BASE_URL}/me` with the `X-API-Key`
+header, the same call the client makes, accepting the standard success
+envelope (`code` 0). Verified live: `/me` returns 200 with the account
+profile while `/verify` 404s.
+
 ## 2026-10-31 — OB-68522 Phase 6: root-path alias for the MCP endpoint
 
 New `RootMcpAliasMiddleware` (looki_mcp/middleware.py), registered
