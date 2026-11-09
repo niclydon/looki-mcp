@@ -45,6 +45,40 @@ window was capped; the existing tool names, arguments, timezone behavior, and
 entry shaping remain intact. Recorded-payload tests cover a present date, an
 absent date, a match on the second page, and the scan cap.
 
+## 2026-11-09 — Contract docs refreshed to the November contract (OB-69846)
+
+`looki_mcp/models.py` and the findings record now state the contract as
+verified on 2026-11-09 (RP-115): `GET /journals/by_date` recorded as retired
+(HTTP 400, code 105) rather than removed, `audio_summary` documented in the
+normalized `{text, topics, truncated}` shape OB-69845 landed, the moment-files
+pagination key renamed to `next_cursor`, the presigned host renamed to
+`user-file.looki.ai`, `search_context` characterised as a comma-separated
+keyword string, the `/moments/{id}` non-UUID 422 trap recorded, and the
+upstream agent skill document recorded as dead (404). A stale findings note
+that still called OB-69844 pending was corrected. PR #15, squash merge
+`d1b6f5ac09bb71876500ca1b513ef6443d78769c`. Docs-only, no deploy.
+
+Full story: `docs/narrative/2026-11-09-api-contract-parity-rp115.md`
+
+## 2026-11-09 — Probe harness re-baselined to the November contract (OB-69847)
+
+`scripts/api_contract_probe.py` now asserts the 2026-11-09 contract:
+`/journals/by_date` removed from the success paths and asserted retired
+(HTTP 400, code 105) alongside `/for_you/items`, `audio_summary` and
+`search_context` shape checks added on a recent-day sample, and the
+moment-files pagination expectation updated to `next_cursor`. The upstream
+skill document now 404s and previously hard-failed the probe before any live
+check ran, so a failed skill fetch now warns and lets the live contract
+decide. Validated both ways: exit 0 against the live API on the branch and
+on merged main (16 serial paced requests, all sections OK), and a
+deliberately flipped expectation exited 1 on both retired paths before
+being reverted. PR #18, squash merge
+`42ca23fbfce3a2d5588ca7d6a2f70d612b93fa40`. Script-only, no deploy. With
+this entry and the OB-69846 entry above, the RP-115 arc is now fully
+documented.
+
+Full story: `docs/narrative/2026-11-09-api-contract-parity-rp115.md`
+
 ## 2026-11-08 — Startup verification via /me (OB-69561)
 
 Looki retired the `open.looki.ai/api/v1/verify` helper endpoint: it now
