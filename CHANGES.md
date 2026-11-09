@@ -3,6 +3,18 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — By-date journal lookup canonicalizes unpadded dates (OB-69852)
+
+`get_journals_by_date` now canonicalizes its `date` argument via the new
+`normalize_date` helper: `strptime` accepts unpadded month/day ("2026-11-9"),
+and the feed scan compares canonical 10-character ISO strings, so the raw
+value silently matched nothing and returned a false-empty result. Unpadded
+input now returns the same entries as the canonical form; invalid dates keep
+the explicit format error. The bounded feed scan also stops when upstream
+repeats a non-advancing cursor instead of refetching the same page until the
+page cap. Tests cover advancing `cursor_date` pages, the stuck cursor, date
+normalization, and the tool-level by-date/today behavior offline.
+
 ## 2026-11-09 — Looki content is never truncated (operator rule)
 
 Per Nic's direct order, every content truncation in the moment and journal
