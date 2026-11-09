@@ -102,7 +102,7 @@ def main() -> int:
     check(sb["bucket_date"] == "2026-06-18" and sb["bucket_start_date"] == "2026-06-17",
           "multi-day storyboard keeps bucket date + start_date")
 
-    # tolerate the bare-list shape returned by /journals/by_date
+    # tolerate a bare-list DayBucket[] response
     bare = FEED["items"]
     check(len(_flatten_buckets(bare)) == 8, "tolerates a bare DayBucket[] (by_date shape)")
     # tolerate junk
