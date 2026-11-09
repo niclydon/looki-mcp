@@ -15,6 +15,13 @@ repeats a non-advancing cursor instead of refetching the same page until the
 page cap. Tests cover advancing `cursor_date` pages, the stuck cursor, date
 normalization, and the tool-level by-date/today behavior offline.
 
+## 2026-11-09 — Send moment-file pagination cursor under the live API key (OB-69857)
+
+`get_moment_files` continues accepting its existing `cursor_id` input for
+backward compatibility, while forwarding that value to Looki as the `cursor`
+query parameter. An offline regression script checks the request path and
+ensures `cursor_id` is never sent on the wire.
+
 ## 2026-11-09 — Looki content is never truncated (operator rule)
 
 Per Nic's direct order, every content truncation in the moment and journal
