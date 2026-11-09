@@ -186,8 +186,7 @@ class PaginatedItems(BaseModel):
 
 class MomentFilesResponse(BaseModel):
     items: list[MomentFileModel]
-    # Live response key is `next_cursor`; walk_files still reads the previous
-    # `next_cursor_id` key, so its pagination reader needs a separate repair.
+    # Live response key is `next_cursor`; pass it back as the `cursor` query param.
     next_cursor: str | None = None
     has_more: bool | None = None
 

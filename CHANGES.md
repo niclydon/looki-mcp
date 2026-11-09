@@ -1,5 +1,7 @@
 # Changes
 
+- `get_moment_files` now sends the live `cursor` query parameter, accepts the legacy `cursor_id` input, and documents the `next_cursor` response token.
+
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 

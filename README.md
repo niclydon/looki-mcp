@@ -374,7 +374,7 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `get_moments_calendar` | Calendar view of active days | `start_date`, `end_date` |
 | `get_moments_by_date` | All moments on a specific date | `date` |
 | `get_moment_details` | Full details for one moment | `moment_id` |
-| `get_moment_files` | Photos/videos from a moment | `moment_id`, `highlight`, `limit` |
+| `get_moment_files` | Photos/videos from a moment | `moment_id`, `highlight`, `limit`, `cursor` (from `next_cursor`; legacy `cursor_id` also accepted) |
 | `search_moments` | Natural language memory search | `query`, `start_date`, `end_date` |
 | `get_highlights` | AI-generated highlights (daily vlogs, comic pages, photo logs), derived from journals; scans up to 93 days per call | `limit`, `cursor_id`, `recorded_from`, `recorded_to` |
 | `get_realtime_event` | Current real-time detection (beta) | — |

@@ -72,27 +72,32 @@ def register_moments_tools(mcp: FastMCP) -> None:
         highlight: bool | None = None,
         cursor_id: str | None = None,
         limit: int = 20,
+        cursor: str | None = None,
     ) -> str:
         """
         Returns photos and videos from a specific moment with pagination. Each file
         includes a temporary URL (valid 1 hour), media type (photo/video), size, and
         optional duration. Use when the user wants to view or reference specific media
-        from a memory.
+        from a memory. The next page uses the returned next_cursor value as cursor.
 
         Args:
             moment_id: UUID of the moment.
             highlight: If True, return only highlighted files. Omit for all files.
-            cursor_id: Pagination cursor from a previous response for fetching the next page.
+            cursor_id: Legacy pagination cursor argument; prefer cursor.
             limit: Number of files to return. Between 1 and 100, default 20.
+            cursor: Pagination cursor from a previous response's next_cursor field.
         """
         if not (1 <= limit <= 100):
             return "Error: limit must be between 1 and 100."
+        if cursor is not None and cursor_id is not None and cursor != cursor_id:
+            return "Error: cursor and cursor_id must match when both are provided."
+        page_cursor = cursor if cursor is not None else cursor_id
         try:
             params: dict[str, str | int | bool] = {"limit": limit}
             if highlight is not None:
                 params["highlight"] = highlight
-            if cursor_id is not None:
-                params["cursor_id"] = cursor_id
+            if page_cursor is not None:
+                params["cursor"] = page_cursor
             async with get_client() as client:
                 response = await client.get(f"/moments/{moment_id}/files", params=params)
                 return json.dumps(unwrap(response), indent=2)

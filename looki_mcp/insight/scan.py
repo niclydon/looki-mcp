@@ -1,5 +1,5 @@
 """Per-shape API window walkers. The Looki endpoints do NOT share a pagination
-contract (bare lists with no cursor; /files uses cursor_id; /journals uses a DATE
+contract (bare lists with no cursor; /files uses cursor; /journals uses a DATE
 cursor capped at 31 days/call; /search is page-based). So this exposes one walker
 PER shape rather than a single leaky abstraction. Every networked walk routes
 through client.governed_get (rate governor + 429 backoff) and reports calls_used
