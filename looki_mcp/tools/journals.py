@@ -26,7 +26,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from looki_mcp import storage
-from looki_mcp.client import format_error, get_client, unwrap
+from looki_mcp.client import format_error, get_client, governed_get, unwrap
 from looki_mcp.config import get_config
 from looki_mcp.tools.convenience import _days_ago_local, _today_local, _today_utc
 
@@ -39,6 +39,10 @@ _DEFAULT_CHAR_CAP = 600
 # Cap the per-object manifest in backfill_journal_media's response so a large
 # sweep returns counts + a sample rather than thousands of report dicts.
 _BACKFILL_OBJECTS_CAP = 250
+# Arbitrary-date lookups page the feed rather than walking unbounded history.
+# Each request returns at most 31 distinct days.
+_DATE_SCAN_MAX_PAGES = 6
+_DATE_SCAN_PAGE_DAYS = 31
 
 # Media temporary_url paths look like /processed/<category>/<file>.jpg — the
 # category encodes provenance (dietary_image, user_event_diary_image, etc.).
@@ -61,7 +65,7 @@ def _flatten_buckets(data: Any) -> list[dict]:
     MULTIPLE buckets (e.g. a multi-day STORYBOARD plus the single-day bucket).
     Each emitted entry is annotated with `bucket_date` / `bucket_start_date` so
     its grouping survives flattening. Tolerates the feed dict shape
-    (`{items: [...]}`), the bare `DayBucket[]` shape (from /journals/by_date),
+    (`{items: [...]}`), the bare `DayBucket[]` shape,
     or junk (returns []).
     """
     if isinstance(data, dict):
@@ -189,6 +193,63 @@ def _bucket_count(data: Any) -> int:
     if isinstance(data, dict):
         return len(data.get("items") or [])
     return 0
+
+
+def _date_prefix(value: Any) -> str | None:
+    return value[:10] if isinstance(value, str) and len(value) >= 10 else None
+
+
+async def _journals_for_date(client: Any, target_date: str) -> tuple[list[dict], int, bool]:
+    """Scan a bounded window of the date-cursor feed for one calendar date."""
+    # Retirement note: Looki retired GET /journals/by_date on 2026-11-09.
+    cursor: str | None = None
+    matching: list[dict] = []
+    pages = 0
+    exhausted = False
+
+    while pages < _DATE_SCAN_MAX_PAGES:
+        params: dict[str, str | int] = {"max_days": _DATE_SCAN_PAGE_DAYS}
+        if cursor:
+            params["cursor_date"] = cursor
+        response = await governed_get(client, "/journals", params=params)
+        data = unwrap(response)
+        pages += 1
+        buckets = data.get("items") or [] if isinstance(data, dict) else []
+        page_days: list[str] = []
+        for bucket in buckets:
+            if not isinstance(bucket, dict):
+                continue
+            bucket_date = bucket.get("date")
+            bucket_day = _date_prefix(bucket_date)
+            if bucket_day:
+                page_days.append(bucket_day)
+            entries = bucket.get("journals") or []
+            selected = [
+                entry for entry in entries
+                if isinstance(entry, dict)
+                and (_date_prefix(entry.get("date")) or bucket_day) == target_date
+            ]
+            if selected:
+                selected_bucket = dict(bucket)
+                selected_bucket["journals"] = selected
+                matching.append(selected_bucket)
+
+        if matching:
+            break
+        next_cursor = data.get("next_cursor_id") if isinstance(data, dict) else None
+        has_more = data.get("has_more") if isinstance(data, dict) else False
+        # The feed is newest-first. Once the oldest bucket in a page is older
+        # than the target, later pages cannot contain it.
+        if page_days and min(page_days) < target_date:
+            exhausted = True
+            break
+        if not has_more or not next_cursor:
+            exhausted = True
+            break
+        cursor = next_cursor
+
+    capped = not matching and not exhausted and pages >= _DATE_SCAN_MAX_PAGES
+    return matching, pages, capped
 
 
 async def _capture_entry_media(entry: dict, *, overwrite: bool = False) -> list[dict]:
@@ -355,10 +416,11 @@ def register_journals_tools(mcp: FastMCP) -> None:
     @mcp.tool
     async def get_journals_by_date(date: str, mode: str = "summary") -> str:
         """
-        Returns all journal entries for one specific date. This is the correct way to
-        read a single day (the feed's day cursor cannot target an arbitrary date). A
-        date may carry several entries (diary vignettes, a dietary log, the daily
-        recap) and occasionally multiple buckets (e.g. a multi-day storyboard).
+        Returns all journal entries for one specific date. The tool scans at most six
+        pages (186 feed days) of GET /journals because its cursor cannot jump to an
+        arbitrary date. A date may carry several entries and occasionally multiple
+        buckets (e.g. a multi-day storyboard); older dates beyond the scan window
+        return an empty result with scan_capped=true.
 
         Args:
             date: The date to retrieve, in YYYY-MM-DD format.
@@ -367,9 +429,12 @@ def register_journals_tools(mcp: FastMCP) -> None:
         if mode not in _MODES:
             return f"Error: mode must be one of {sorted(_MODES)}."
         try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            return "Error: date must be in YYYY-MM-DD format."
+        try:
             async with get_client() as client:
-                response = await client.get("/journals/by_date", params={"on_date": date})
-                data = unwrap(response)
+                data, pages, capped = await _journals_for_date(client, date)
             if mode == "full":
                 return json.dumps(data, indent=2)
             entries = _flatten_buckets(data)
@@ -379,6 +444,8 @@ def register_journals_tools(mcp: FastMCP) -> None:
                 "entry_count": len(entries),
                 "by_type": _by_type_counts(entries),
                 "entries": [_shape_entry(e, mode) for e in entries],
+                "scan_pages": pages,
+                "scan_capped": capped,
             }
             return json.dumps(out, indent=2)
         except Exception as exc:
@@ -464,8 +531,9 @@ def register_journals_tools(mcp: FastMCP) -> None:
         """
         Returns today's journal entries, with the daily recap (YESTERDAY_RECAP) surfaced
         first when present. "Today" is computed in the configured timezone
-        (LOOKI_USER_TIMEZONE), or UTC if unset. Use for "what does my journal say about
-        today?" or "give me today's recap".
+        (LOOKI_USER_TIMEZONE), or UTC if unset. Scans at most six pages (186 feed days)
+        of GET /journals. Use for "what does my journal say about today?" or "give me
+        today's recap".
 
         Args:
             mode: Detail level — 'index', 'summary' (default), or 'full'.
@@ -477,8 +545,7 @@ def register_journals_tools(mcp: FastMCP) -> None:
         date_utc = _today_utc()
         try:
             async with get_client() as client:
-                response = await client.get("/journals/by_date", params={"on_date": date_local})
-                data = unwrap(response)
+                data, pages, capped = await _journals_for_date(client, date_local)
             entries = _flatten_buckets(data)
             # Lead with the flagship daily narrative; stable sort keeps the rest in order.
             entries.sort(key=lambda e: 0 if e.get("type") == "YESTERDAY_RECAP" else 1)
@@ -489,6 +556,8 @@ def register_journals_tools(mcp: FastMCP) -> None:
                 "entry_count": len(entries),
                 "by_type": _by_type_counts(entries),
                 "entries": [_shape_entry(e, mode) for e in entries],
+                "scan_pages": pages,
+                "scan_capped": capped,
             }
             return json.dumps(out, indent=2)
         except Exception as exc:

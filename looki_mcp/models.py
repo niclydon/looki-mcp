@@ -315,7 +315,6 @@ class JournalsFeedResponse(BaseModel):
 
 # /journals            returns: JournalsFeedResponse  (params: cursor_date, max_days≤31, sort_order=asc|desc)
 # /journals/calendar   returns: list[JournalCalendarDayModel]  (params: start_date, end_date)
-# /journals/by_date    returns: list[JournalDayBucketModel]    (params: on_date)
 # /journals/{id}       returns: JournalEntryModel
 
 
