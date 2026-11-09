@@ -6,6 +6,7 @@ import json
 
 from fastmcp import FastMCP
 
+from looki_mcp.audio_summary import normalize_moment_payload
 from looki_mcp.client import format_error, get_client, unwrap
 
 
@@ -27,7 +28,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
                     "/moments/calendar",
                     params={"start_date": start_date, "end_date": end_date},
                 )
-                return json.dumps(unwrap(response), indent=2)
+                return json.dumps(normalize_moment_payload(unwrap(response), summary=True), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"
 
@@ -44,7 +45,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
         try:
             async with get_client() as client:
                 response = await client.get("/moments", params={"on_date": date})
-                return json.dumps(unwrap(response), indent=2)
+                return json.dumps(normalize_moment_payload(unwrap(response), summary=True), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"
 
@@ -61,7 +62,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
         try:
             async with get_client() as client:
                 response = await client.get(f"/moments/{moment_id}")
-                return json.dumps(unwrap(response), indent=2)
+                return json.dumps(normalize_moment_payload(unwrap(response), summary=False), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"
 
@@ -135,6 +136,6 @@ def register_moments_tools(mcp: FastMCP) -> None:
                 params["end_date"] = end_date
             async with get_client() as client:
                 response = await client.get("/moments/search", params=params)
-                return json.dumps(unwrap(response), indent=2)
+                return json.dumps(normalize_moment_payload(unwrap(response), summary=True), indent=2)
         except Exception as exc:
             return f"Error: {format_error(exc)}"

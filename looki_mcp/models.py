@@ -28,7 +28,7 @@ https://web.looki.ai/agent/looki-memory/SKILL.md
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -103,6 +103,19 @@ class MomentFileModel(BaseModel):
     tz: str | None = None
 
 
+class AudioSummaryModel(BaseModel):
+    """Normalized moment audio summary exposed by Looki tools.
+
+    Upstream sends either prose or a JSON-encoded object containing `topics`
+    and optional `text`/`summary`/`content`. Tools normalize both to this shape;
+    list/search outputs may set `truncated`, while detail outputs are full.
+    """
+
+    text: str | None = None
+    topics: list[Any] | None = None
+    truncated: bool = False
+
+
 class MomentModel(BaseModel):
     """A captured memory. Returned by /moments, /moments/{id}, /moments/search items.
 
@@ -111,8 +124,10 @@ class MomentModel(BaseModel):
 
     Moment payloads observed live through 2026-11-09 (list, detail, search,
     and calendar highlight) carry `search_context` and `audio_summary` fields.
-    See the field notes below. `audio_summary` remains a raw pass-through here;
-    its normalized MCP presentation is tracked separately in OB-69845."""
+    See the field notes below. Upstream `audio_summary` is a raw string (prose,
+    or a JSON-encoded object with a topics array); the moment tools normalize
+    it into AudioSummaryModel ({text, topics, truncated}) - OB-69845, landed
+    2026-11-09."""
 
     id: str  # UUID
     title: str
@@ -124,13 +139,14 @@ class MomentModel(BaseModel):
     start_time: str
     end_time: str
     # Observed on every sampled moment key set from 2026-09-15 through
-    # 2026-11-09; samples were comma-separated keywords, 34-123 chars.
+    # 2026-11-09; a plain comma-separated keyword string, 34-123 chars sampled.
     search_context: str | None = None
     # Observed on every sampled day from 2026-09-15 through 2026-11-09 and
-    # non-empty on 43-93% of moments by day (5/6 on 2026-11-09). Usually prose;
-    # one pure-AUDIO sample was a JSON-encoded string with a topics array.
-    # This documentation model does not normalize it; OB-69845 owns that work.
-    audio_summary: str | None = None
+    # non-empty on 43-93% of moments by day (5/6 on 2026-11-09). Upstream form
+    # is a string: usually prose; one pure-AUDIO sample was a JSON-encoded
+    # string with a topics array. The tools normalize both forms into
+    # AudioSummaryModel (OB-69845); this field documents that output shape.
+    audio_summary: AudioSummaryModel | None = None
 
 
 class CalendarDayModel(BaseModel):

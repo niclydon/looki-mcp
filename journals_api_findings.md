@@ -38,8 +38,8 @@ All are `GET`, require the `X-API-Key` header, share the base URL
 **Retired endpoint (2026-11-09):** `GET /journals/by_date` returns HTTP 400,
 envelope code 105; Looki identifies `GET /journals` as its successor. The old
 bare-list `DayBucket[]` response shape is historical and must not be treated as
-a callable route. The existing MCP convenience tools are tracked for repair in
-OB-69844.
+a callable route. The MCP by-date tools were re-implemented over `GET /journals`
+in OB-69844 (landed 2026-11-09).
 
 ### Param notes (validated live)
 - `max_days` counts **distinct days**, not entries (`max_days=2`→2 days, `=14`→14 days). The default with NO params is 7.
