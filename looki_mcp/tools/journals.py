@@ -200,6 +200,14 @@ def _date_prefix(value: Any) -> str | None:
     return value[:10] if isinstance(value, str) and len(value) >= 10 else None
 
 
+def normalize_date(value: Any) -> str | None:
+    """Return a strptime-accepted date as a canonical ten-character ISO date."""
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+    except (ValueError, TypeError):
+        return None
+
+
 async def _journals_for_date(client: Any, target_date: str) -> tuple[list[dict], int, bool]:
     """Scan a bounded window of the date-cursor feed for one calendar date."""
     # Retirement note: Looki retired GET /journals/by_date on 2026-11-09.
@@ -244,17 +252,16 @@ async def _journals_for_date(client: Any, target_date: str) -> tuple[list[dict],
         if page_days and min(page_days) < target_date:
             exhausted = True
             break
-        if not has_more or not next_cursor:
+        if not has_more:
             exhausted = True
             break
-        if next_cursor == cursor:
-            # Upstream repeated its cursor: paging again would refetch the
-            # same page until the page cap. Treat the scan as exhausted.
-            exhausted = True
+        if not next_cursor or next_cursor == cursor:
+            # Upstream stalled before reaching the requested day. This is not
+            # an authoritative empty result; expose it as a capped scan.
             break
         cursor = next_cursor
 
-    capped = not matching and not exhausted and pages >= _DATE_SCAN_MAX_PAGES
+    capped = not matching and not exhausted
     return matching, pages, capped
 
 
@@ -323,25 +330,6 @@ def _capture_summary(reports: list[dict]) -> dict:
         "failed": sum(1 for r in reports if r.get("status") == "failed"),
         "skipped": sum(1 for r in reports if r.get("status") == "skipped"),
     }
-
-
-def normalize_date(value: Any) -> str | None:
-    """Canonicalize an agent-supplied date to YYYY-MM-DD, or None if invalid.
-
-    `datetime.strptime(..., "%Y-%m-%d")` accepts unpadded month/day
-    ("2026-11-9"), and the feed scan compares canonical 10-character ISO
-    strings, so an unnormalized value silently matches nothing. Returning
-    the strftime form makes padded and unpadded inputs behave identically.
-    """
-    if not isinstance(value, str):
-        return None
-    try:
-        parsed = datetime.strptime(value, "%Y-%m-%d")
-    except ValueError:
-        return None
-    # strftime("%Y") does not zero-pad years below 1000 on glibc; format
-    # explicitly so the result is always the 10-character canonical form.
-    return f"{parsed.year:04d}-{parsed.month:02d}-{parsed.day:02d}"
 
 
 def normalize_sort_order(sort_order: str) -> str | None:
@@ -454,18 +442,18 @@ def register_journals_tools(mcp: FastMCP) -> None:
         """
         if mode not in _MODES:
             return f"Error: mode must be one of {sorted(_MODES)}."
-        normalized = normalize_date(date)
-        if normalized is None:
+        normalized_date = normalize_date(date)
+        if normalized_date is None:
             return "Error: date must be in YYYY-MM-DD format."
-        date = normalized
+        date = normalized_date
         try:
             async with get_client() as client:
-                data, pages, capped = await _journals_for_date(client, date)
+                data, pages, capped = await _journals_for_date(client, normalized_date)
             if mode == "full":
                 return json.dumps(data, indent=2)
             entries = _flatten_buckets(data)
             out = {
-                "date": date,
+                "date": normalized_date,
                 "bucket_count": _bucket_count(data),
                 "entry_count": len(entries),
                 "by_type": _by_type_counts(entries),
