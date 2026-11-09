@@ -11,9 +11,9 @@ client-side composites (recent, today, backfill, search). The reshaping helpers
 (`_flatten_buckets`, `_shape_entry`, `_by_type_counts`) are module-level so they
 can be unit-tested without a server (see scripts/test_journals_helpers.py).
 
-Token discipline: a day holds ~7 entries and the long-form types run ~2–2.5k
-chars each, so every listing tool defaults to a truncated `summary` mode. Pass
-`mode="full"` for the verbatim payload or `mode="index"` for an id/title spine.
+Looki content is never truncated in this server (operator rule, 2026-11-09):
+`summary` mode returns entry content in full. Pass `mode="full"` for the
+verbatim payload or `mode="index"` for an id/title spine with no content.
 """
 
 from __future__ import annotations
@@ -32,10 +32,10 @@ from looki_mcp.tools.convenience import _days_ago_local, _today_local, _today_ut
 
 # Valid values for the `mode` knob shared by every listing/composite tool.
 _MODES = {"index", "summary", "full"}
-# backfill is the highest-volume call, so it forbids 'full' to bound output —
-# read individual entries verbatim with get_journal_entry instead.
+# backfill is the highest-volume call, so it forbids 'full' (the verbatim
+# day-bucket shape) — summary mode already carries full entry content, and
+# individual entries can be read verbatim with get_journal_entry.
 _BACKFILL_MODES = {"index", "summary"}
-_DEFAULT_CHAR_CAP = 600
 # Cap the per-object manifest in backfill_journal_media's response so a large
 # sweep returns counts + a sample rather than thousands of report dicts.
 _BACKFILL_OBJECTS_CAP = 250
@@ -118,13 +118,14 @@ def _shape_media(item: dict, journal_id: str | None = None, date: str | None = N
     return shaped
 
 
-def _shape_entry(entry: dict, mode: str, char_cap: int = _DEFAULT_CHAR_CAP) -> dict:
-    """Reshapes a journal entry for a given token budget.
+def _shape_entry(entry: dict, mode: str) -> dict:
+    """Reshapes a journal entry for display.
 
     - `full`    -> the entry unchanged (verbatim content + media).
     - `index`   -> id/type/title/date/has_media spine, NO content or description.
-    - `summary` -> the spine plus description, content truncated to `char_cap`
-                   (with a `content_truncated` flag), and URL-free media metadata.
+    - `summary` -> the spine plus description and the FULL content
+                   (`content_truncated` is always False; Looki content is
+                   never truncated here), and URL-free media metadata.
     """
     if mode == "full":
         return entry
@@ -144,8 +145,8 @@ def _shape_entry(entry: dict, mode: str, char_cap: int = _DEFAULT_CHAR_CAP) -> d
 
     content = entry.get("content")
     if isinstance(content, str):
-        shaped["content"] = content[:char_cap]
-        shaped["content_truncated"] = len(content) > char_cap
+        shaped["content"] = content
+        shaped["content_truncated"] = False
     else:
         shaped["content"] = None
         shaped["content_truncated"] = False
@@ -348,7 +349,8 @@ def register_journals_tools(mcp: FastMCP) -> None:
         and the only tool exposing the date cursor for paging into history. Use for
         "what has my journal said lately?" or to walk backwards through entries.
 
-        Defaults to a token-efficient summary (long entry bodies are truncated). The
+        Defaults to summary mode; entry content is returned in full (Looki
+        content is never truncated in this server). The
         response's `next_cursor_id` is a DATE — pass it back as `cursor_date` to fetch
         the next older page (or use backfill_journals to do that automatically).
 
@@ -357,7 +359,7 @@ def register_journals_tools(mcp: FastMCP) -> None:
             max_days: Number of distinct days to return. Between 1 and 31, default 7.
             sort_order: Day ordering. Accepts asc/desc or ASC/DESC (case-insensitive).
                 Wire protocol is lowercase; default DESC (newest first; param omitted).
-            mode: Detail level — 'index' (id/title spine), 'summary' (truncated content, default), or 'full' (verbatim API payload with raw day-buckets).
+            mode: Detail level — 'index' (id/title spine), 'summary' (full content, default), or 'full' (verbatim API payload with raw day-buckets).
         """
         if not (1 <= max_days <= 31):
             return "Error: max_days must be between 1 and 31."
@@ -581,7 +583,7 @@ def register_journals_tools(mcp: FastMCP) -> None:
         Args:
             cursor_date: Start paging strictly before this date (YYYY-MM-DD). Omit to start at the most recent entries.
             max_total_days: Hard cap on distinct days to fetch. Between 1 and 93, default 31.
-            mode: Detail level — 'index' (default) or 'summary' (truncated content). 'full' is intentionally disallowed for this high-volume tool.
+            mode: Detail level — 'index' (default) or 'summary' (full content). 'full' is intentionally disallowed for this high-volume tool.
             max_pages: Hard cap on API requests (each up to 31 days). Between 1 and 12, default 6.
         """
         if not (1 <= max_total_days <= 93):

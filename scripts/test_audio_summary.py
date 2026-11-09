@@ -75,12 +75,13 @@ def main() -> int:
     }
 
     long = {"text": "t" * 700, "topics": ["x" * 250] + [f"topic-{i}" for i in range(21)]}
+    # Operator rule 2026-11-09: Looki content is never truncated, in any mode.
     compact = normalize_audio_summary(json.dumps(long), summary=True)
     assert compact is not None
-    assert len(compact["text"]) == 600
-    assert len(compact["topics"]) == 20
-    assert len(compact["topics"][0]) == 200
-    assert compact["truncated"] is True
+    assert len(compact["text"]) == 700
+    assert len(compact["topics"]) == 22
+    assert len(compact["topics"][0]) == 250
+    assert compact["truncated"] is False
     full = normalize_audio_summary(json.dumps(long), summary=False)
     assert full is not None and len(full["text"]) == 700 and len(full["topics"]) == 22
     assert full["truncated"] is False
@@ -121,7 +122,7 @@ def main() -> int:
     assert with_details["results"][0]["audio_summary"]["topics"] == ["synthetic topic"]
     activity = json.loads(asyncio.run(mcp.tools["get_recent_activity"]()))
     assert activity["data"][0]["highlight_moment"]["audio_summary"]["text"] == "Synthetic recap."
-    print("PASS audio_summary normalization (prose, topics JSON, caps, nested payload)")
+    print("PASS audio_summary normalization (prose, topics JSON, no truncation, nested payload)")
     return 0
 
 

@@ -54,9 +54,8 @@ def register_convenience_tools(mcp: FastMCP) -> None:
         Use for "what have I been up to lately?", "how active was I this week?", or any
         question about recent activity patterns without knowing specific dates.
 
-        Calendar highlight moments include normalized `audio_summary` values.
-        Summary text is capped at 600 characters and topics at 20 entries (200
-        characters per topic string); `truncated` reports when content was shortened.
+        Calendar highlight moments include normalized `audio_summary` values
+        in full; Looki content is never truncated in this server.
 
         The response includes the date range it queried with under `period`, with both
         local (server-configured TZ) and UTC values so consumers can see exactly what
@@ -108,8 +107,8 @@ def register_convenience_tools(mcp: FastMCP) -> None:
 
         The response includes both `date_local` and `date_utc` so consumers can see
         which calendar day was queried. Each moment's `audio_summary` is normalized
-        to `{text, topics, truncated}`; summary text is capped at 600 characters and
-        topics at 20 entries (200 characters per topic string).
+        to `{text, topics, truncated}` with the complete text and topics
+        (`truncated` is always False; Looki content is never truncated here).
         """
         tz = get_config().user_timezone or "UTC"
         date_local = _today_local()
@@ -144,7 +143,7 @@ def register_convenience_tools(mcp: FastMCP) -> None:
         including its photos and videos.
 
         The returned moment has a full normalized `audio_summary` (`{text, topics,
-        truncated}`) without summary truncation.
+        truncated}`).
 
         Args:
             moment_id: UUID of the moment.
@@ -185,7 +184,7 @@ def register_convenience_tools(mcp: FastMCP) -> None:
         wants to find AND read about memories in a single step.
 
         Full moment details include normalized `audio_summary` values in the shape
-        `{text, topics, truncated}` without summary truncation.
+        `{text, topics, truncated}`.
 
         Date arguments are passed through verbatim; this tool does not apply timezone
         conversion to user-supplied dates. Use whatever date the user gave you.

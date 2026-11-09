@@ -123,10 +123,10 @@ def main() -> int:
 
     print("test _shape_entry summary")
     dietary = next(e for e in flat if e["id"] == "dt1")
-    summ = _shape_entry(dietary, "summary", char_cap=600)
+    summ = _shape_entry(dietary, "summary")
     check(summ.get("description") == "d", "summary includes description")
-    check(len(summ.get("content", "")) == 600 and summ.get("content_truncated") is True,
-          "summary truncates long content at char_cap and flags it")
+    check(summ.get("content") == LONG and summ.get("content_truncated") is False,
+          "summary returns long content in full and never flags truncation")
     blob = repr(summ)
     check("SRC_SECRET" not in blob and "THUMB_SECRET" not in blob and "x-looki-token" not in blob,
           "summary never leaks a short-lived JWT (source OR thumbnail temporary_url)")

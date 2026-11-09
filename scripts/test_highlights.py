@@ -155,8 +155,8 @@ def main() -> int:
           "shaped item never leaks a short-lived media temporary_url")
     long_entry = _entry("long1", "PLOG", content="x" * 2000)
     long_shaped = _shape_highlight(long_entry)
-    check(len(long_shaped["content"]) == 600 and long_shaped["content_truncated"] is True,
-          "long content is truncated at the cap and flagged")
+    check(long_shaped["content"] == long_entry["content"] and long_shaped["content_truncated"] is False,
+          "long content is returned in full and never flagged truncated")
 
     print()
     if failures:
