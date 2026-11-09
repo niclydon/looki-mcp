@@ -339,7 +339,9 @@ def normalize_date(value: Any) -> str | None:
         parsed = datetime.strptime(value, "%Y-%m-%d")
     except ValueError:
         return None
-    return parsed.strftime("%Y-%m-%d")
+    # strftime("%Y") does not zero-pad years below 1000 on glibc; format
+    # explicitly so the result is always the 10-character canonical form.
+    return f"{parsed.year:04d}-{parsed.month:02d}-{parsed.day:02d}"
 
 
 def normalize_sort_order(sort_order: str) -> str | None:

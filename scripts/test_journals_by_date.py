@@ -150,6 +150,9 @@ def main() -> int:
     assert journals.normalize_date("2026-11-09") == "2026-11-09"
     assert journals.normalize_date("2026-11-9") == "2026-11-09"
     assert journals.normalize_date("2026-1-8") == "2026-01-08"
+    # Years below 1000 still canonicalize to the 10-character form.
+    assert journals.normalize_date("0001-01-01") == "0001-01-01"
+    assert journals.normalize_date("0999-1-1") == "0999-01-01"
     for bad in ["2026-02-30", "2026-13-01", "2026/11/09", "20261109", "not-a-date", "", None, 20261109]:
         assert journals.normalize_date(bad) is None, bad
 
