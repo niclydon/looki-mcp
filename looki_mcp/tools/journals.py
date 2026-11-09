@@ -247,6 +247,11 @@ async def _journals_for_date(client: Any, target_date: str) -> tuple[list[dict],
         if not has_more or not next_cursor:
             exhausted = True
             break
+        if next_cursor == cursor:
+            # Upstream repeated its cursor: paging again would refetch the
+            # same page until the page cap. Treat the scan as exhausted.
+            exhausted = True
+            break
         cursor = next_cursor
 
     capped = not matching and not exhausted and pages >= _DATE_SCAN_MAX_PAGES
@@ -318,6 +323,25 @@ def _capture_summary(reports: list[dict]) -> dict:
         "failed": sum(1 for r in reports if r.get("status") == "failed"),
         "skipped": sum(1 for r in reports if r.get("status") == "skipped"),
     }
+
+
+def normalize_date(value: Any) -> str | None:
+    """Canonicalize an agent-supplied date to YYYY-MM-DD, or None if invalid.
+
+    `datetime.strptime(..., "%Y-%m-%d")` accepts unpadded month/day
+    ("2026-11-9"), and the feed scan compares canonical 10-character ISO
+    strings, so an unnormalized value silently matches nothing. Returning
+    the strftime form makes padded and unpadded inputs behave identically.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return None
+    # strftime("%Y") does not zero-pad years below 1000 on glibc; format
+    # explicitly so the result is always the 10-character canonical form.
+    return f"{parsed.year:04d}-{parsed.month:02d}-{parsed.day:02d}"
 
 
 def normalize_sort_order(sort_order: str) -> str | None:
@@ -425,15 +449,15 @@ def register_journals_tools(mcp: FastMCP) -> None:
         return an empty result with scan_capped=true.
 
         Args:
-            date: The date to retrieve, in YYYY-MM-DD format.
+            date: The date to retrieve, in YYYY-MM-DD format (unpadded month/day accepted and canonicalized).
             mode: Detail level — 'index', 'summary' (default), or 'full' (verbatim payload).
         """
         if mode not in _MODES:
             return f"Error: mode must be one of {sorted(_MODES)}."
-        try:
-            datetime.strptime(date, "%Y-%m-%d")
-        except (ValueError, TypeError):
+        normalized = normalize_date(date)
+        if normalized is None:
             return "Error: date must be in YYYY-MM-DD format."
+        date = normalized
         try:
             async with get_client() as client:
                 data, pages, capped = await _journals_for_date(client, date)
