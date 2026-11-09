@@ -30,7 +30,7 @@ Also: https://clawhub.ai/haibo-looki/looki-memory
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -104,6 +104,19 @@ class MomentFileModel(BaseModel):
     tz: str | None = None
 
 
+class AudioSummaryModel(BaseModel):
+    """Normalized moment audio summary exposed by Looki tools.
+
+    Upstream sends either prose or a JSON-encoded object containing `topics`
+    and optional `text`/`summary`/`content`. Tools normalize both to this shape;
+    list/search outputs may set `truncated`, while detail outputs are full.
+    """
+
+    text: str | None = None
+    topics: list[Any] | None = None
+    truncated: bool = False
+
+
 class MomentModel(BaseModel):
     """A captured memory. Returned by /moments, /moments/{id}, /moments/search items.
 
@@ -111,8 +124,9 @@ class MomentModel(BaseModel):
     not a bare FileModel.
 
     Moment payloads observed live on 2026-10-16 (list, detail, search, and
-    calendar highlight) also carry a `search_context` field - see the field
-    note below."""
+    calendar highlight) also carry a `search_context` field. Live payloads
+    additionally carry `audio_summary` (observed 2026-11-09); tools normalize its
+    prose and JSON-string variants into AudioSummaryModel."""
 
     id: str  # UUID
     title: str
@@ -125,9 +139,9 @@ class MomentModel(BaseModel):
     end_time: str
     # Observed live 2026-10-16 on moment list, detail, search, and calendar
     # highlight payloads; absent from this model before the 2026-10-16 audit.
-    # Undocumented upstream; shape not yet characterized, so it is documented
-    # here as an optional pass-through only (no parsing / validation).
     search_context: object | None = None
+    # Normalized by the tools from the upstream prose or JSON-string shape.
+    audio_summary: AudioSummaryModel | None = None
 
 
 class CalendarDayModel(BaseModel):

@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastmcp import FastMCP
 
+from looki_mcp.audio_summary import normalize_moment_payload
 from looki_mcp.client import format_error, get_client, unwrap
 from looki_mcp.config import get_config
 
@@ -52,6 +53,10 @@ def register_convenience_tools(mcp: FastMCP) -> None:
         configured timezone (LOOKI_USER_TIMEZONE) for "today"; defaults to UTC if unset.
         Use for "what have I been up to lately?", "how active was I this week?", or any
         question about recent activity patterns without knowing specific dates.
+
+        Calendar highlight moments include normalized `audio_summary` values.
+        Summary text is capped at 600 characters and topics at 20 entries (200
+        characters per topic string); `truncated` reports when content was shortened.
 
         The response includes the date range it queried with under `period`, with both
         local (server-configured TZ) and UTC values so consumers can see exactly what
@@ -87,7 +92,7 @@ def register_convenience_tools(mcp: FastMCP) -> None:
                             "start_date_utc": start_date_utc,
                             "end_date_utc": end_date_utc,
                         },
-                        **payload,
+                        **normalize_moment_payload(payload, summary=True),
                     },
                     indent=2,
                 )
@@ -102,7 +107,9 @@ def register_convenience_tools(mcp: FastMCP) -> None:
         Use for "what did I do today?" or "show me today's memories".
 
         The response includes both `date_local` and `date_utc` so consumers can see
-        which calendar day was queried.
+        which calendar day was queried. Each moment's `audio_summary` is normalized
+        to `{text, topics, truncated}`; summary text is capped at 600 characters and
+        topics at 20 entries (200 characters per topic string).
         """
         tz = get_config().user_timezone or "UTC"
         date_local = _today_local()
@@ -117,7 +124,7 @@ def register_convenience_tools(mcp: FastMCP) -> None:
                         "date_local": date_local,
                         "date_utc": date_utc,
                         "timezone": tz,
-                        **payload,
+                        **normalize_moment_payload(payload, summary=True),
                     },
                     indent=2,
                 )
@@ -135,6 +142,9 @@ def register_convenience_tools(mcp: FastMCP) -> None:
         single call. More efficient than calling get_moment_details and get_moment_files
         separately. Use when the user wants to see or reference a specific memory
         including its photos and videos.
+
+        The returned moment has a full normalized `audio_summary` (`{text, topics,
+        truncated}`) without summary truncation.
 
         Args:
             moment_id: UUID of the moment.
@@ -156,7 +166,7 @@ def register_convenience_tools(mcp: FastMCP) -> None:
                 files_data = unwrap(files_resp)
 
             return json.dumps(
-                {"moment": moment_data, "media": files_data},
+                {"moment": normalize_moment_payload(moment_data, summary=False), "media": files_data},
                 indent=2,
             )
         except Exception as exc:
@@ -173,6 +183,9 @@ def register_convenience_tools(mcp: FastMCP) -> None:
         Runs a natural language search and automatically fetches full details for each
         result in one call. Returns richer results than raw search. Use when the user
         wants to find AND read about memories in a single step.
+
+        Full moment details include normalized `audio_summary` values in the shape
+        `{text, topics, truncated}` without summary truncation.
 
         Date arguments are passed through verbatim; this tool does not apply timezone
         conversion to user-supplied dates. Use whatever date the user gave you.
@@ -217,12 +230,12 @@ def register_convenience_tools(mcp: FastMCP) -> None:
             detailed: list[dict] = []
             for i, resp in enumerate(detail_responses):
                 if isinstance(resp, BaseException):
-                    detailed.append(moments[i])
+                    detailed.append(normalize_moment_payload(moments[i], summary=False))
                 else:
                     try:
-                        detailed.append(unwrap(resp))
+                        detailed.append(normalize_moment_payload(unwrap(resp), summary=False))
                     except Exception:
-                        detailed.append(moments[i])
+                        detailed.append(normalize_moment_payload(moments[i], summary=False))
 
             total = (
                 search_data.get("total", len(detailed))
