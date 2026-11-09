@@ -15,6 +15,13 @@ repeats a non-advancing cursor instead of refetching the same page until the
 page cap. Tests cover advancing `cursor_date` pages, the stuck cursor, date
 normalization, and the tool-level by-date/today behavior offline.
 
+## 2026-11-09 — Keep bounded journal scans honest on a stuck date cursor (OB-69858)
+
+Arbitrary-date journal scans now report `scan_capped=true` when Looki repeats
+the same cursor before the requested date is reached. Date inputs accepted by
+`strptime` are normalized with `date().isoformat()` so leading-zero years keep
+the canonical `YYYY-MM-DD` shape used by date comparisons.
+
 ## 2026-11-09 — Looki content is never truncated (operator rule)
 
 Per Nic's direct order, every content truncation in the moment and journal
