@@ -82,7 +82,8 @@ def register_moments_tools(mcp: FastMCP) -> None:
         Args:
             moment_id: UUID of the moment.
             highlight: If True, return only highlighted files. Omit for all files.
-            cursor_id: Pagination cursor from a previous response for fetching the next page.
+            cursor_id: Pagination cursor from a previous response's `next_cursor` field.
+                This is sent to Looki as the `cursor` query parameter.
             limit: Number of files to return. Between 1 and 100, default 20.
         """
         if not (1 <= limit <= 100):
@@ -92,7 +93,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
             if highlight is not None:
                 params["highlight"] = highlight
             if cursor_id is not None:
-                params["cursor_id"] = cursor_id
+                params["cursor"] = cursor_id
             async with get_client() as client:
                 response = await client.get(f"/moments/{moment_id}/files", params=params)
                 return json.dumps(unwrap(response), indent=2)
