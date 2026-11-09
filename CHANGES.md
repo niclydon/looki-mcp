@@ -3,6 +3,16 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Journal date tools use the paged feed (OB-69844)
+
+Looki retired `GET /journals/by_date` and now returns the standard deprecation
+envelope. `get_journals_by_date` and `get_todays_journal` now scan the governed
+`GET /journals` date cursor, select the requested calendar date, and stop after
+six pages (186 feed days). The responses report scan pages and whether the
+window was capped; the existing tool names, arguments, timezone behavior, and
+entry shaping remain intact. Recorded-payload tests cover a present date, an
+absent date, a match on the second page, and the scan cap.
+
 ## 2026-11-08 — Startup verification via /me (OB-69561)
 
 Looki retired the `open.looki.ai/api/v1/verify` helper endpoint: it now
