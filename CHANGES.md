@@ -3,6 +3,17 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Looki content is never truncated (operator rule)
+
+Per Nic's direct order, every content truncation in the moment and journal
+tools is removed. `audio_summary` normalization no longer bounds text (was
+600 chars), topics (was 20), or topic strings (was 200) in summary mode;
+journal `summary` shaping returns entry content in full instead of capping
+at 600 chars; highlights return full journal content. The `truncated` /
+`content_truncated` flags remain in the output shapes, always False, for
+consumer compatibility. `index` mode (spine, no content) is unchanged, and
+search still returns a labeled `snippet` excerpt alongside the full entry.
+
 ## 2026-11-09 — Surface Looki moment audio summaries (OB-69845)
 
 Moment tools now normalize Looki's prose and JSON-string `audio_summary` values

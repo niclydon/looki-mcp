@@ -107,8 +107,10 @@ class AudioSummaryModel(BaseModel):
     """Normalized moment audio summary exposed by Looki tools.
 
     Upstream sends either prose or a JSON-encoded object containing `topics`
-    and optional `text`/`summary`/`content`. Tools normalize both to this shape;
-    list/search outputs may set `truncated`, while detail outputs are full.
+    and optional `text`/`summary`/`content`. Tools normalize both to this shape
+    with the complete value in every mode (Looki content is never truncated
+    in this server, operator rule 2026-11-09); `truncated` is always False and
+    is retained only for shape stability.
     """
 
     text: str | None = None

@@ -37,7 +37,6 @@ MAX_SCAN_PAGES = 6
 MAX_SCAN_DAYS = 93
 _PAGE_DAYS = 31
 
-_CONTENT_CHAR_CAP = 600
 
 
 def _date_part(value: Any) -> str | None:
@@ -133,8 +132,8 @@ def _shape_highlight(entry: dict) -> dict:
     """Shape one journal entry into the highlights output envelope item.
 
     Mirrors the retired endpoint's item shape as closely as the journals
-    payload allows: id, type, title, description, content (truncated, with
-    a flag), timestamps, and media references. Media is URL-free metadata
+    payload allows: id, type, title, description, content (full; Looki
+    content is never truncated in this server), timestamps, and media references. Media is URL-free metadata
     (media_type, category, has_thumbnail) reusing the journals shaping, so
     no short-lived temporary_url leaks into a listing; read the entry with
     get_journal_entry for live media URLs.
@@ -148,8 +147,8 @@ def _shape_highlight(entry: dict) -> dict:
         "type": entry.get("type"),
         "title": entry.get("title"),
         "description": entry.get("description"),
-        "content": content[:_CONTENT_CHAR_CAP] if isinstance(content, str) else None,
-        "content_truncated": isinstance(content, str) and len(content) > _CONTENT_CHAR_CAP,
+        "content": content if isinstance(content, str) else None,
+        "content_truncated": False,
         "date": edate,
         "start_date": entry.get("start_date"),
         "recorded_at": entry.get("recorded_at"),

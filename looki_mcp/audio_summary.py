@@ -1,17 +1,20 @@
-"""Normalize the two audio_summary payload shapes seen from Looki moments."""
+"""Normalize the two audio_summary payload shapes seen from Looki moments.
+
+Looki content is never truncated in this server (operator rule, 2026-11-09):
+the summary/detail distinction that used to bound summary-mode text at 600
+chars is gone. `summary` is accepted for call-site compatibility and ignored;
+every mode returns the complete value. `truncated` is always False and is
+kept only so the {text, topics, truncated} shape stays stable for consumers.
+"""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
-_SUMMARY_TEXT_LIMIT = 600
-_SUMMARY_TOPIC_LIMIT = 20
-_SUMMARY_TOPIC_TEXT_LIMIT = 200
 
-
-def normalize_audio_summary(value: Any, *, summary: bool) -> dict[str, Any] | None:
-    """Return a stable {text, topics, truncated} shape without losing detail mode."""
+def normalize_audio_summary(value: Any, *, summary: bool = False) -> dict[str, Any] | None:
+    """Return a stable {text, topics, truncated} shape with the full value."""
     if value is None:
         return None
 
@@ -39,39 +42,10 @@ def normalize_audio_summary(value: Any, *, summary: bool) -> dict[str, Any] | No
         text_value = json.dumps(value, ensure_ascii=False, sort_keys=True)
         topics = []
 
-    truncated = False
-    if summary:
-        if isinstance(text_value, str) and len(text_value) > _SUMMARY_TEXT_LIMIT:
-            text_value = text_value[:_SUMMARY_TEXT_LIMIT]
-            truncated = True
-        if len(topics) > _SUMMARY_TOPIC_LIMIT:
-            topics = topics[:_SUMMARY_TOPIC_LIMIT]
-            truncated = True
-        topics, topics_truncated = _bound_topic_values(topics)
-        truncated = truncated or topics_truncated
-
-    return {"text": text_value, "topics": topics, "truncated": truncated}
+    return {"text": text_value, "topics": topics, "truncated": False}
 
 
-def _bound_topic_values(value: Any) -> tuple[Any, bool]:
-    if isinstance(value, str):
-        return value[:_SUMMARY_TOPIC_TEXT_LIMIT], len(value) > _SUMMARY_TOPIC_TEXT_LIMIT
-    if isinstance(value, list):
-        bounded = [_bound_topic_values(item) for item in value[:_SUMMARY_TOPIC_LIMIT]]
-        return [item for item, _ in bounded], len(value) > _SUMMARY_TOPIC_LIMIT or any(
-            changed for _, changed in bounded
-        )
-    if isinstance(value, dict):
-        pairs = [(key, _bound_topic_values(item)) for key, item in list(value.items())[:_SUMMARY_TOPIC_LIMIT]]
-        bounded = {key: item for key, (item, _) in pairs}
-        changed = len(value) > _SUMMARY_TOPIC_LIMIT or any(
-            child_changed for _, (_, child_changed) in pairs
-        )
-        return bounded, changed
-    return value, False
-
-
-def normalize_moment_payload(value: Any, *, summary: bool) -> Any:
+def normalize_moment_payload(value: Any, *, summary: bool = False) -> Any:
     """Copy nested API payloads, normalizing every moment audio_summary field."""
     if isinstance(value, list):
         return [normalize_moment_payload(item, summary=summary) for item in value]

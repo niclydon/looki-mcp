@@ -395,10 +395,10 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `capture_journal_media` | Save one entry's AI images to durable MinIO storage | `journal_id`, `overwrite` |
 | `backfill_journal_media` | Sweep history and save all journal media to MinIO | `cursor_date`, `max_total_days`, `max_pages`, `overwrite` |
 
-Journal listing tools accept a `mode` knob — `index` (id/title spine), `summary`
-(truncated content, the default), or `full` (verbatim payload) — to keep token cost in
-check, since a day holds several long entries. Use `get_journal_entry` to read any one
-entry in full.
+Journal listing tools accept a `mode` knob — `index` (id/title spine, no content),
+`summary` (full content, the default), or `full` (verbatim payload). Looki content
+is never truncated in this server (operator rule, 2026-11-09); `index` is the way to
+get a spine without bodies.
 
 **Journal media capture.** Journal images are AI-generated and their `temporary_url`s are
 short-lived (~10 min) JWTs. When MinIO is configured (see below), `capture_journal_media`
