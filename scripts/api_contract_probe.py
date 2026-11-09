@@ -26,6 +26,16 @@ expected to succeed; the error-code vocabulary is 100 = invalid params,
 105 = deprecated endpoint, 106 = missing auth token; moment payloads are
 checked for the search_context field; the journal type vocabulary is the
 October 2026 observed set (unknown future types warn, never fail).
+
+Re-baselined 2026-11-09 (OB-69847): /journals/by_date was retired upstream
+under the same contract (HTTP 400, envelope code 105) and is now asserted
+as deprecated alongside /for_you/items; moment payloads are additionally
+shape-checked for audio_summary (string: prose, or a JSON string carrying
+topics) and search_context (comma-separated keyword string) on a recent-day
+sample; the moment-files pagination expectation is the renamed response
+key next_cursor (was next_cursor_id). The upstream skill doc URL returns
+404 as of 2026-11-09, so a failed skill fetch warns and the live contract
+checks decide the exit code.
 """
 from __future__ import annotations
 
@@ -54,7 +64,6 @@ KNOWN_PATHS: list[tuple[str, dict | None]] = [
     ("/moments/search", {"query": "coffee", "page_size": "1"}),
     ("/journals", {"max_days": "1"}),
     ("/journals/calendar", {"start_date": "2026-07-01", "end_date": "2026-07-07"}),
-    ("/journals/by_date", {"on_date": "2026-07-01"}),
     ("/realtime/latest-event", None),
 ]
 
@@ -62,9 +71,10 @@ KNOWN_PATHS: list[tuple[str, dict | None]] = [
 # HTTP 400 with envelope code 105 (deprecated endpoint).
 DEPRECATED_PATHS: list[tuple[str, dict | None]] = [
     ("/for_you/items", {"limit": "1"}),
+    ("/journals/by_date", {"on_date": "2026-07-01"}),
 ]
 
-# Envelope error-code vocabulary (verified live 2026-10-16):
+# Envelope error-code vocabulary (verified live 2026-10-16, re-verified 2026-11-09):
 #   0   = success
 #   100 = invalid params
 #   105 = deprecated endpoint
@@ -257,6 +267,16 @@ def probe_live(base_url: str, api_key: str) -> tuple[list[str], int]:
             mid = moments[0].get("id")
             r = get(client, f"{base}/moments/{mid}/files", params={"limit": 2})
             data = r.json().get("data") or {}
+            # Moment-files pagination key was renamed next_cursor_id ->
+            # next_cursor (verified 2026-11-09); the envelope must carry it.
+            if "next_cursor" in data:
+                print("  OK moment-files payload carries next_cursor pagination key")
+            else:
+                failures.append(
+                    "moment-files payload missing next_cursor pagination key "
+                    f"(keys={sorted(data.keys())})"
+                )
+                print("  FAIL moment-files payload missing next_cursor pagination key")
             items = data.get("items") or []
             if items:
                 f = (items[0].get("file") or {})
@@ -273,6 +293,60 @@ def probe_live(base_url: str, api_key: str) -> tuple[list[str], int]:
         else:
             print("  WARN: no moments for FileModel/search_context sample date")
 
+        print("=== moment audio_summary / search_context shape checks (recent day) ===")
+        # audio_summary exists upstream only from 2026-09-15 on, so sample a
+        # recent day (today, falling back to yesterday) rather than the July
+        # FileModel sample. Individual moments may omit the key or carry a
+        # null, so the contract asserted is: across the day's moments the
+        # keys appear, and every present non-null value has the documented
+        # shape (audio_summary: string; search_context: string).
+        from datetime import date as _date, timedelta as _timedelta
+
+        recent_moments: list = []
+        for offset in (0, 1):
+            day = (_date.today() - _timedelta(days=offset)).isoformat()
+            r = get(client, base + "/moments", params={"on_date": day})
+            body, code = _body_and_code(r)
+            sample = body.get("data") if isinstance(body, dict) else None
+            if isinstance(sample, list) and sample:
+                recent_moments = sample
+                print(f"  shape sample: {len(sample)} moments on {day}")
+                break
+        if recent_moments:
+            dict_moments = [m for m in recent_moments if isinstance(m, dict)]
+            if any("audio_summary" in m for m in dict_moments):
+                print("  OK recent moment payloads carry audio_summary")
+            else:
+                failures.append("recent moment payloads missing audio_summary field")
+                print("  FAIL recent moment payloads missing audio_summary field")
+            bad_audio = [
+                m.get("id") for m in dict_moments
+                if m.get("audio_summary") is not None
+                and not isinstance(m.get("audio_summary"), str)
+            ]
+            if bad_audio:
+                failures.append(f"audio_summary not a string on moments {bad_audio}")
+                print(f"  FAIL audio_summary not a string on moments {bad_audio}")
+            else:
+                print("  OK audio_summary values are strings (prose or JSON-with-topics) or null")
+            if any("search_context" in m for m in dict_moments):
+                print("  OK recent moment payloads carry search_context")
+            else:
+                failures.append("recent moment payloads missing search_context field")
+                print("  FAIL recent moment payloads missing search_context field")
+            bad_ctx = [
+                m.get("id") for m in dict_moments
+                if m.get("search_context") is not None
+                and not isinstance(m.get("search_context"), str)
+            ]
+            if bad_ctx:
+                failures.append(f"search_context not a string on moments {bad_ctx}")
+                print(f"  FAIL search_context not a string on moments {bad_ctx}")
+            else:
+                print("  OK search_context values are comma-separated keyword strings or null")
+        else:
+            print("  WARN: no moments today or yesterday for audio_summary shape sample")
+
     return failures, stats["requests"]
 
 
@@ -287,24 +361,31 @@ def main() -> int:
     _load_dotenv()
 
     print(f"=== skill: {SKILL_URL} ===")
+    skill_text = None
     try:
         skill_text, digest = fetch_skill()
     except Exception as exc:
-        print(f"FAIL: could not fetch skill: {exc}", file=sys.stderr)
-        return 1
-    print(f"sha256={digest}")
-    print(f"sha256_prefix={digest[:16]}")
-    if digest.startswith(BASELINE_SHA256_PREFIX):
-        print(f"baseline match: yes ({BASELINE_SHA256_PREFIX})")
-    else:
-        print(
-            f"baseline match: NO — skill changed since discovery "
-            f"(was {BASELINE_SHA256_PREFIX}…); re-read skill for new endpoints"
-        )
-    paths = skill_paths(skill_text)
-    print(f"skill-documented path templates ({len(paths)}):")
-    for p in paths:
-        print(f"  {p}")
+        # Since 2026-11-09 the upstream skill doc URL returns 404 and no
+        # OpenAPI/docs routes exist on the API base (OB-69846). The live
+        # contract below is the baseline now, so warn and continue; only
+        # --skill-only mode (whose sole check is the skill doc) fails here.
+        print(f"WARN: could not fetch skill ({exc}); continuing with live checks")
+        if args.skill_only:
+            return 1
+    if skill_text is not None:
+        print(f"sha256={digest}")
+        print(f"sha256_prefix={digest[:16]}")
+        if digest.startswith(BASELINE_SHA256_PREFIX):
+            print(f"baseline match: yes ({BASELINE_SHA256_PREFIX})")
+        else:
+            print(
+                f"baseline match: NO — skill changed since discovery "
+                f"(was {BASELINE_SHA256_PREFIX}…); re-read skill for new endpoints"
+            )
+        paths = skill_paths(skill_text)
+        print(f"skill-documented path templates ({len(paths)}):")
+        for p in paths:
+            print(f"  {p}")
 
     if args.skill_only:
         print("=== skill-only mode: live probe skipped ===")
