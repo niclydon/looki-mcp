@@ -7,25 +7,23 @@ unmodified, so model drift never breaks tool behavior; it only affects how
 accurately the docs match reality.
 
 All shapes below have been re-verified against the live Looki Open API as of
-**2026-10-16** (moments / profile / realtime / journals / FileModel metadata
-nesting; the retired /for_you/items endpoint - see the retired-endpoint note
-below). Earlier bulk checks: 2026-04-29 (moments/highlights/profile/
+**2026-11-09** (moments / profile / realtime / journals / FileModel metadata
+nesting; retired endpoints and field changes - see notes below). Earlier bulk checks: 2026-04-29 (moments/highlights/profile/
 realtime), 2026-06-20 (journals feed), and 2026-07-18 (moments / highlights /
 profile / realtime / journals).
 
-Verification basis (2026-10-16): live probes from furnace against the live
-API. The upstream agent skill doc
-(https://web.looki.ai/agent/looki-memory/SKILL.md) is unchanged since July -
-sha256 4c5c991cb1165b910c6cd4d95ff20d4dc1f717678233a6a27a9d30421387f939 -
-and still presents /for_you/items as live, which is why this in-repo contract
-carries the correction.
+Verification basis (2026-11-09): approximately 130 direct API requests from
+Furnace, with no rate-limit responses. The upstream agent skill doc URL
+(https://web.looki.ai/agent/looki-memory/SKILL.md) now returns 404; probes
+found no OpenAPI or documentation routes on the API base. The observed live
+contract, rather than the unavailable upstream skill, is recorded here.
 
 The Looki API wraps every response in `{code, detail, data}`; our `unwrap()`
 helper strips that envelope, so the models below describe the *unwrapped* `data`
 field, not the raw HTTP body.
 
-Canonical docs: https://web.looki.ai/agent/looki-memory/SKILL.md
-Also: https://clawhub.ai/haibo-looki/looki-memory
+Former upstream reference (returns 404 as of 2026-11-09):
+https://web.looki.ai/agent/looki-memory/SKILL.md
 """
 
 from __future__ import annotations
@@ -68,9 +66,10 @@ class FileModel(BaseModel):
 
     **2026-07 live shape:** duration and dimensions live under `metadata`.
     Top-level `size` / `duration_ms` are legacy fallbacks (not present on current
-    moments/files responses). Presigned URLs often expire ~10 minutes (JWT),
-    though skill docs still say ~1 hour generically.
-    Host observed: `devo-user-file.looki.ai`.
+    moments/files responses).
+    Host observed 2026-11-09: `user-file.looki.ai`, replacing the earlier
+    `devo-user-file.looki.ai` host. The observed JWT expiry remains about
+    one hour for this presigned host.
     """
 
     temporary_url: str
@@ -110,9 +109,10 @@ class MomentModel(BaseModel):
     `cover_file` is structurally a MomentFileModel (wraps a FileModel under .file),
     not a bare FileModel.
 
-    Moment payloads observed live on 2026-10-16 (list, detail, search, and
-    calendar highlight) also carry a `search_context` field - see the field
-    note below."""
+    Moment payloads observed live through 2026-11-09 (list, detail, search,
+    and calendar highlight) carry `search_context` and `audio_summary` fields.
+    See the field notes below. `audio_summary` remains a raw pass-through here;
+    its normalized MCP presentation is tracked separately in OB-69845."""
 
     id: str  # UUID
     title: str
@@ -123,11 +123,14 @@ class MomentModel(BaseModel):
     tz: str | None = None
     start_time: str
     end_time: str
-    # Observed live 2026-10-16 on moment list, detail, search, and calendar
-    # highlight payloads; absent from this model before the 2026-10-16 audit.
-    # Undocumented upstream; shape not yet characterized, so it is documented
-    # here as an optional pass-through only (no parsing / validation).
-    search_context: object | None = None
+    # Observed on every sampled moment key set from 2026-09-15 through
+    # 2026-11-09; samples were comma-separated keywords, 34-123 chars.
+    search_context: str | None = None
+    # Observed on every sampled day from 2026-09-15 through 2026-11-09 and
+    # non-empty on 43-93% of moments by day (5/6 on 2026-11-09). Usually prose;
+    # one pure-AUDIO sample was a JSON-encoded string with a topics array.
+    # This documentation model does not normalize it; OB-69845 owns that work.
+    audio_summary: str | None = None
 
 
 class CalendarDayModel(BaseModel):
@@ -140,8 +143,11 @@ class CalendarDayModel(BaseModel):
 
 # /moments/calendar returns: list[CalendarDayModel]
 # /moments?on_date=...   returns: list[MomentModel]
-# /moments/{id}/files    returns: {"items": list[MomentFileModel], next_cursor_id, has_more}
+# /moments/{id}/files    returns: {"items": list[MomentFileModel], next_cursor, has_more}
 # /moments/search        returns: {"items": list[MomentModel], has_more}  (page-based)
+# /moments/{id} requires a UUID path segment; non-UUID values such as "audio",
+# "transcripts", or "latest" return HTTP 422, envelope code 100. These are not
+# separate endpoints (control-verified 2026-11-09).
 # RETIRED: /for_you/items - do NOT call. Live probe on 2026-10-16 returned
 # HTTP 400 with envelope code 105 (deprecated endpoint); the upstream detail
 # points to GET /journals instead. ForYouItemModel / HighlightsResponse below
@@ -162,7 +168,9 @@ class PaginatedItems(BaseModel):
 
 class MomentFilesResponse(BaseModel):
     items: list[MomentFileModel]
-    next_cursor_id: str | None = None
+    # Live response key is `next_cursor`; walk_files still reads the previous
+    # `next_cursor_id` key, so its pagination reader needs a separate repair.
+    next_cursor: str | None = None
     has_more: bool | None = None
 
 
@@ -235,7 +243,7 @@ class JournalMediaFile(BaseModel):
     """The image (or other media) behind a journal media item. AI-generated; only
     `IMAGE` observed in journals so far (VIDEO/AUDIO permitted but unseen)."""
 
-    temporary_url: str  # short-lived JWT (~10 min observed)
+    temporary_url: str  # short-lived JWT (~1 hour observed)
     media_type: str  # "IMAGE" per live API
     metadata: FileMetadata | None = None
     size: int | None = None  # legacy
@@ -285,7 +293,8 @@ class JournalEntryModel(BaseModel):
 
 
 class JournalDayBucketModel(BaseModel):
-    """One day-grouping in the journals feed / by_date response. NOTE: a single
+    """One day-grouping in the journals feed. The retired /journals/by_date
+    endpoint returned this shape as a bare list. NOTE: a single
     calendar date can yield MULTIPLE buckets (e.g. a multi-day STORYBOARD plus the
     regular single-day bucket)."""
 
@@ -315,7 +324,8 @@ class JournalsFeedResponse(BaseModel):
 
 # /journals            returns: JournalsFeedResponse  (params: cursor_date, max_days≤31, sort_order=asc|desc)
 # /journals/calendar   returns: list[JournalCalendarDayModel]  (params: start_date, end_date)
-# /journals/by_date    returns: list[JournalDayBucketModel]    (params: on_date)
+# RETIRED 2026-11-09: GET /journals/by_date returns HTTP 400, envelope code
+# 105; use GET /journals instead. The old bare-list shape is historical only.
 # /journals/{id}       returns: JournalEntryModel
 
 
@@ -333,9 +343,10 @@ class LookiResponseEnvelope(BaseModel):
     wraps its payload in this envelope. `client.unwrap()` strips this layer
     automatically so tools see only the inner `data` value.
 
-    Error-code vocabulary (envelope `code`, verified 2026-10-16):
+    Error-code vocabulary (envelope `code`, verified 2026-11-09):
     0 = success; 100 = invalid params (unchanged); 105 = deprecated
-    endpoint (new - returned for the retired /for_you/items, HTTP 400);
+    endpoint (returned for retired /for_you/items and /journals/by_date,
+    HTTP 400);
     106 = missing auth token (new)."""
 
     code: int  # 0 == success, non-zero == error

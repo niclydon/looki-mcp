@@ -3,17 +3,15 @@
 **Status:** Authoritative mapping, validated against the live API on **2026-06-20**,
 re-checked **2026-07-18** (FileModel `metadata` nesting; `sort_order` must be
 lowercase `asc`|`desc`; additional journal types `COMIC_PAGE`, `WEEKLY_JOURNAL`,
-`SYSTEM_POST` observed), and re-verified **2026-10-16** (retired `/for_you/items`;
+`SYSTEM_POST` observed), re-verified **2026-10-16** (retired `/for_you/items`;
 new journal types `DAILY_HEALTH_REPORT`, `DAILY_VLOG`, `MANUAL_AUDIO_SUMMARY`,
-`PLOG`; `content`/`thumbnail` omission nuances; error codes 105/106).
-**Verification basis (2026-10-16):** live probes from furnace against the live API.
-The upstream agent skill doc is unchanged since July - sha256
-`4c5c991cb1165b910c6cd4d95ff20d4dc1f717678233a6a27a9d30421387f939` - and still
-presents `/for_you/items` as live, which is why this in-repo doc carries the
-correction.
-**Sources:** (1) Official Looki agent skill `https://web.looki.ai/agent/looki-memory/SKILL.md`
-(the canonical param contract); (2) direct live probing of the user's account (the real
-content shape, which the skill doc only sketches with a single `DIARY` example).
+`PLOG`; `content`/`thumbnail` omission nuances; error codes 105/106), and
+updated **2026-11-09** for current endpoint retirements and moment/file fields.
+**Verification basis (2026-11-09):** approximately 130 direct API requests from
+Furnace, with no rate-limit responses. The upstream agent skill URL now returns
+404, and no OpenAPI or documentation routes were found on the API base.
+**Sources:** direct live API probes from Furnace. The previous agent-skill
+reference is unavailable and is not a current contract source.
 
 ## Overview
 The Journals feature exposes AI-generated long-form text recaps and a new family of
@@ -26,7 +24,7 @@ feed) is retired - a live probe returned HTTP 400 with envelope code 105
 Do not call `/for_you/items`. Its content family now lives in the journals feed:
 `DAILY_VLOG` migrated from a for_you type to a journal type.
 
-## Endpoints (4)
+## Active endpoints (3)
 All are `GET`, require the `X-API-Key` header, share the base URL
 `https://open.looki.ai/api/v1`, and return the standard `{code, detail, data}` envelope
 (`unwrap()` strips it). Rate limit: 60 req/min (HTTP 429 on excess).
@@ -35,8 +33,13 @@ All are `GET`, require the `X-API-Key` header, share the base URL
 |---|---|---|
 | `/journals` | `cursor_date` (YYYY-MM-DD, optional), `max_days` (int, default **7**, max **31**), `sort_order` (**`asc`\|`desc` lowercase only**, default newest-first) | `{ items: DayBucket[], next_cursor_id: str\|null, has_more: bool }` |
 | `/journals/calendar` | `start_date` (req), `end_date` (req) — YYYY-MM-DD | **bare** `[{ date: str }]` — which days have entries |
-| `/journals/by_date` | `on_date` (req, YYYY-MM-DD) | **bare** `DayBucket[]` for that date |
 | `/journals/{id}` | path: journal UUID | a single `JournalEntry` object |
+
+**Retired endpoint (2026-11-09):** `GET /journals/by_date` returns HTTP 400,
+envelope code 105; Looki identifies `GET /journals` as its successor. The old
+bare-list `DayBucket[]` response shape is historical and must not be treated as
+a callable route. The existing MCP convenience tools are tracked for repair in
+OB-69844.
 
 ### Param notes (validated live)
 - `max_days` counts **distinct days**, not entries (`max_days=2`→2 days, `=14`→14 days). The default with NO params is 7.
@@ -118,36 +121,51 @@ and day caps.
 
 ## Media (AI-generated images)
 - All observed `media_type` = `IMAGE` (model permits `VIDEO`/`AUDIO`; none seen in journals).
-- URL host: `user.file.devo.looki.ai`; path category encodes provenance:
+- URL host observed 2026-11-09: `user-file.looki.ai` (replacing the earlier
+  `devo-user-file.looki.ai` host); path category encodes provenance:
   `/processed/{user_event_diary_image|dietary_image|storyboard_image|meeting_analysis_cover_image|daily_routine_image}/...`
-- `temporary_url` carries an `x-looki-token` JWT; observed expiry ~**10 min** (the official
-  doc states ~1h generically). Treat as short-lived; re-fetch via the entry if stale.
+- `temporary_url` carries an `x-looki-token` JWT; observed expiry remains about
+  **1 hour**. Re-fetch via the entry if stale.
 
-## Mapping to MCP tools (proposed — see implementation plan)
+## Mapping to MCP tools
 - `/journals/calendar` → `get_journals_calendar(start_date, end_date)` (mirror of `get_moments_calendar`)
-- `/journals/by_date`  → `get_journals_by_date(date)` (mirror of `get_moments_by_date`)
 - `/journals/{id}`     → `get_journal_entry(journal_id)` (mirror of `get_moment_details`)
 - `/journals`          → `get_journals(cursor_date?, max_days?, sort_order?)` (the feed; supports backfill)
+- The prior `get_journals_by_date` route mapping is retired with the upstream
+  endpoint; its replacement is tracked by OB-69844.
 - Convenience (timezone-aware, mirroring `convenience.py`): `get_recent_journals(days)`,
-  `get_todays_journal()`, plus a bounded `backfill_journals(...)` looper and a
-  client-side `search_journals(query, ...)` (no server-side journal search exists).
+  `get_todays_journal()` (currently affected by the retired by-date route;
+  repair tracked by OB-69844), plus a bounded `backfill_journals(...)` looper
+  and a client-side `search_journals(query, ...)` (no server-side journal
+  search exists).
 
-## Cross-cutting API notes (2026-10-16)
+## Cross-cutting API notes (2026-11-09)
 
 ### Error-code vocabulary (envelope `code`)
 | code | meaning |
 |---|---|
 | 0 | success |
 | 100 | invalid params (unchanged) |
-| 105 | deprecated endpoint (new) - e.g. the retired `GET /for_you/items` (HTTP 400) |
+| 105 | deprecated endpoint - e.g. retired `GET /for_you/items` and `GET /journals/by_date` (HTTP 400) |
 | 106 | missing auth token (new) |
 
-### Moment payloads: `search_context`
-Moment payloads observed live on 2026-10-16 (list, detail, search, and calendar
-highlight) include a `search_context` field. It was absent from `MomentModel`
-until this re-verification; see `looki_mcp/models.py`.
+### Moment payloads and pagination
+Moment payloads observed across the 2026-09-15–2026-11-09 samples carry
+`search_context` (a comma-separated keyword string, 34–123 chars) and
+`audio_summary` on every sampled key set. `audio_summary` was non-empty on
+43–93% of moments by day (5/6 on 2026-11-09); observed values were prose except
+one pure-AUDIO sample whose value was a JSON-encoded string with a `topics`
+array. Its normalized MCP presentation is tracked in OB-69845. Moment-files
+pagination now returns `next_cursor`; the repository's `walk_files` still reads
+`next_cursor_id`, so its multi-page walk is not confirmed against the new key.
+The runtime reader gap is filed as OB-69849 and is not changed by this
+documentation item. The `/journals` feed continues to use date-valued
+`next_cursor_id`.
 
+The `/moments/{id}` detail path requires a UUID. Non-UUID segments such as
+`audio`, `transcripts`, and `latest` return HTTP 422, envelope code 100; they
+are not standalone routes (control-verified 2026-11-09).
 ### `/me` observed key set
-Observed live on 2026-10-16: `birthday`, `first_name`, `gender`, `id`,
+Observed live on 2026-11-09: `birthday`, `first_name`, `gender`, `id`,
 `last_name`, `tz`. `email` / `region` / `kind` were absent (already optional
 in `looki_mcp/models.py`).
