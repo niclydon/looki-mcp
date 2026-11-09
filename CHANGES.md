@@ -186,6 +186,13 @@ backward compatibility, while forwarding that value to Looki as the `cursor`
 query parameter. An offline regression script checks the request path and
 ensures `cursor_id` is never sent on the wire.
 
+## 2026-11-09 — Moment file pagination follows the live cursor contract (OB-69849)
+
+`walk_files` now sends the upstream `cursor` request parameter and reads the
+`next_cursor` response key. Synthetic pagination tests prove page advancement,
+the no-more-pages stop, and the call budget; the journals date cursor remains
+unchanged. See [the implementation narrative](docs/narrative/2026-11-09-ob-69849-moment-file-pagination.md).
+
 ## 2026-11-09 — Looki content is never truncated (operator rule)
 
 Per Nic's direct order, every content truncation in the moment and journal
