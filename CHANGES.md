@@ -3,6 +3,18 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Composite context tools (OB-69898, RP-116)
+
+New module looki_mcp/tools/composites.py with two composites over the
+RP-116 record tools. `get_day_context(date)` returns one date as labeled
+sections (moments index-level, daily summary, health report, journals in
+summary mode via the bounded feed scan). `get_personal_context()` returns
+the memory overview plus the most recent daily summary (7-day window)
+and weekly summary (28-day window). Every section is labeled with its
+source record type, a failing ingredient surfaces as that section's
+`error` without failing the call, and section content is in full.
+Tool count 28 → 30.
+
 ## 2026-11-09 — Chat history tool (OB-69897, RP-116)
 
 New tool `get_chat_history(limit, since, cursor)` over `GET /chat/history`.
