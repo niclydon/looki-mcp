@@ -3,6 +3,40 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-10 — RP-116 narrative: the official-parity record (docs-only)
+
+Narrative-only, written as the ship step of track RP-116. The six
+parity tools themselves landed on 2026-11-09 under the entries below
+(OB-69894 through OB-69900, PRs #26-#32, deployed at `1e0d4dc`); what
+they did not leave behind at close was the long-form record, and this
+entry's companion doc supplies it:
+[official parity RP-116](docs/narrative/2026-11-10-official-parity-rp116.md).
+
+The narrative covers the parts the per-tool entries could not: the
+official stack inventory (two public repos under `looki-ai`, the
+hosted OAuth MCP, the npm CLI), the OAuth wall in front of the
+hosted server's unpublished tool list, and why the enumeration is
+an open item rather than a blocker. It records the discovery rule
+the pack bought with a miss (the 2026-11-09 morning probe's
+speculative path list skipped four endpoints whose names it did not
+guess; the official CLI command table is now the probe's candidate
+generator of record, ahead of speculation), the four verified
+endpoint contracts including the 7-day summaries rejection and the
+silent 30-day health truncation, and the three rejected options
+(hosted-OAuth migration, CLI as a runtime dependency, waiting on
+the enumeration) with their reasons.
+
+It also corrects the pack brief's arithmetic in the record: six
+tools were added to a 24-tool server, and the deployed count is 30.
+The upstream watch enrollment (nightly digest: the `looki-ai` org
+plus both repos; the npm-only CLI named as the known watch gap)
+closes the doc. No runtime code changes, nothing redeploys, and the
+running service is untouched; it already carries the pack's code at
+`1e0d4dc`, verified by tool list (30) and a live weekly-summaries
+call. The downstream half of RP-116, the Nexus ingest and medallion
+walk over these same four record types, is recorded in the nexus
+repo at `docs/narrative/2026-11-10-looki-ingest-medallion-rp116.md`.
+
 ## 2026-11-09 — Contract probe re-baselined to the official-parity contract (OB-69900, RP-116)
 
 scripts/api_contract_probe.py gains live checks for the four RP-116
