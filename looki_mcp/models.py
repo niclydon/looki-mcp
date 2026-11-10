@@ -18,6 +18,21 @@ Furnace, with no rate-limit responses. The upstream agent skill doc URL
 found no OpenAPI or documentation routes on the API base. The observed live
 contract, rather than the unavailable upstream skill, is recorded here.
 
+Second pass (2026-11-09 evening, official-parity, RP-116): Looki now also
+ships an official access stack — the looki-ai/looki-plugin and
+looki-ai/looki-skills GitHub repos (skill `looki-personal-memory`, sha256
+prefix 76718777b5d9, identical in both), a hosted OAuth MCP server at
+https://open.looki.ai/mcp, and the @looki-ai/cli npm package (v0.6.1,
+2026-11-09). That discovery surfaced four more endpoints on this same
+API-key surface, all verified live from Furnace with the account key and
+zero rate-limit responses: GET /memory/overview, GET /summaries,
+GET /health-reports, GET /chat/history (see the per-model notes and
+official_parity_api_findings.md). The hosted MCP and CLI are upstream
+context only — they are NOT runtime dependencies of this server. The
+hosted MCP's tool list is unpublished; its auth is OAuth
+(authorization_code + refresh_token, PKCE S256, dynamic client
+registration, scope `read` only).
+
 The Looki API wraps every response in `{code, detail, data}`; our `unwrap()`
 helper strips that envelope, so the models below describe the *unwrapped* `data`
 field, not the raw HTTP body.
@@ -460,6 +475,17 @@ class JournalsFeedResponse(BaseModel):
 # RETIRED 2026-11-09: GET /journals/by_date returns HTTP 400, envelope code
 # 105; use GET /journals instead. The old bare-list shape is historical only.
 # /journals/{id}       returns: JournalEntryModel
+#
+# Official-parity endpoints (added 2026-11-09 evening, RP-116; all live on
+# the API-key surface — see official_parity_api_findings.md):
+# /memory/overview     returns: MemoryOverviewResponse
+# /summaries           returns: SummariesResponse  (params: start_date, end_date, type=daily|weekly|chat|moment)
+# /health-reports      returns: HealthReportsResponse  (params: start_date, end_date)
+# /chat/history        returns: ChatHistoryResponse  (params: limit, since, cursor)
+# FALSE ROUTES: /moments/dates and /journals/dates are not endpoints — they
+# return HTTP 422 via path-param capture on the /{id} detail routes.
+# /memory, /overview, /summary, /health, /health/reports, /chat, /chats,
+# /chat/messages, /chat/summaries all return 404.
 
 
 class VerifyResponse(BaseModel):
