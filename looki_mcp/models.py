@@ -78,6 +78,34 @@ class MemoryOverviewResponse(BaseModel):
     updated_at: str | None = None
 
 
+class SummaryItemModel(BaseModel):
+    """One life-summary record from GET /summaries (live, 2026-11-09).
+
+    Summaries are a distinct record type from journals: daily/weekly life
+    summaries, chat summaries, and moment summaries. `summary` is prose and
+    is returned in full by the tools.
+    """
+
+    on_date: str  # YYYY-MM-DD
+    summary: str | None = None
+
+
+class SummariesResponse(BaseModel):
+    """Returned by GET /summaries (live, 2026-11-09, official-parity pass).
+
+    Required query params are exactly `start_date` / `end_date` plus `type`
+    in {daily, weekly, chat, moment} (lowercase only; an uppercase value
+    returns 422). Passing `date=` or `from_date`/`to_date` instead returns
+    a misleading HTTP 400, envelope code 100, "Date parameter is required".
+    Spans longer than 7 days are rejected for the daily-type records
+    (HTTP 400, code 100, verified live 2026-11-09); get_summaries pages
+    longer ranges as adjacent non-overlapping 7-day windows.
+    """
+
+    type: str
+    items: list[SummaryItemModel]
+
+
 class FileMetadata(BaseModel):
     """Nested under FileModel.metadata (live 2026-07)."""
 
