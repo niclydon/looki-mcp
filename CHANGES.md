@@ -3,6 +3,17 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Life summaries tool (OB-69895, RP-116)
+
+New tool `get_summaries(start_date, end_date, type)` over `GET /summaries`,
+with type in daily | weekly | chat | moment (lowercase, validated
+client-side). Summaries are a distinct record type from journals. Verified
+live range contract: spans over 7 days are rejected for the daily-type
+records (HTTP 400, code 100), so longer ranges are paged as adjacent
+non-overlapping 7-day windows and merged; the required params are exactly
+`start_date`/`end_date`. Items return in full. models.py documents the
+shape as SummariesResponse. Tool count 25 → 26.
+
 ## 2026-11-09 — Memory overview tool (OB-69894, RP-116)
 
 New tool `get_memory_overview` over `GET /memory/overview`, an endpoint on
