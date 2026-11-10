@@ -12,7 +12,7 @@ memories, moments, photos, AI-generated highlights, and written journal entries.
 ## What It Does
 
 Looki L1 is a wearable camera that passively captures your daily life. This MCP server
-exposes your Looki data through 26 tools that AI assistants can use to answer questions like:
+exposes your Looki data through 27 tools that AI assistants can use to answer questions like:
 
 - "What did I do last Thursday?"
 - "Find the moment where I was at the coffee shop"
@@ -282,7 +282,7 @@ Expected startup output:
 ```
 looki-mcp: Verifying Looki base URL...
 looki-mcp: Base URL verified OK.
-[looki-mcp] Server running on http://0.0.0.0:3456/mcp (26 tools)
+[looki-mcp] Server running on http://0.0.0.0:3456/mcp (27 tools)
 ```
 
 The server validates your credentials before accepting connections — if anything is
@@ -373,6 +373,7 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `get_profile` | User profile (name, email, timezone) | — |
 | `get_memory_overview` | Consolidated Looki memory overview (identity, lifestyle, traits, relationships, current experiences) | — |
 | `get_summaries` | Looki life summaries (daily/weekly/chat/moment) over a date range; long ranges paged in 7-day windows | `start_date`, `end_date`, `type` |
+| `get_health_reports` | Looki daily health reports (diet, activity metrics, estimates); long ranges paged in 30-day windows | `start_date`, `end_date` |
 | `get_moments_calendar` | Calendar view of active days | `start_date`, `end_date` |
 | `get_moments_by_date` | All moments on a specific date | `date` |
 | `get_moment_details` | Full details for one moment | `moment_id` |
@@ -413,7 +414,7 @@ the server works unchanged.
 
 ```
 GET /health
-{"status":"ok","server":"looki-mcp","version":"1.1.0","tools":26}
+{"status":"ok","server":"looki-mcp","version":"1.1.0","tools":27}
 ```
 
 Useful for Docker healthchecks, load balancers, and uptime monitoring.

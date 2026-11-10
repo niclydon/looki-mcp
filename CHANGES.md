@@ -3,6 +3,16 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Health reports tool (OB-69896, RP-116)
+
+New tool `get_health_reports(start_date, end_date)` over
+`GET /health-reports`. Items are {date, tz, report_data} with report_data
+(summary, calorie, daily_metrics, dietary_review, events, time_range)
+returned in full. Verified live: wide ranges are silently truncated
+upstream to the first 30 days of the range, so longer ranges are paged
+as adjacent non-overlapping 30-day windows and merged. models.py
+documents the shape as HealthReportsResponse. Tool count 26 → 27.
+
 ## 2026-11-09 — Life summaries tool (OB-69895, RP-116)
 
 New tool `get_summaries(start_date, end_date, type)` over `GET /summaries`,

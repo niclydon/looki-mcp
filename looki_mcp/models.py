@@ -106,6 +106,44 @@ class SummariesResponse(BaseModel):
     items: list[SummaryItemModel]
 
 
+class HealthReportData(BaseModel):
+    """The `report_data` payload of one health report (live, 2026-11-09).
+
+    All values are Looki's own observations/estimates. Field types vary by
+    field (summary/dietary_review are prose; calorie/daily_metrics/events
+    are structured); the tools pass report_data through unmodified and in
+    full, so the members are typed loosely here.
+    """
+
+    summary: Any | None = None
+    calorie: Any | None = None
+    daily_metrics: Any | None = None
+    dietary_review: Any | None = None
+    events: Any | None = None
+    time_range: Any | None = None
+
+
+class HealthReportItemModel(BaseModel):
+    """One daily health report from GET /health-reports (live, 2026-11-09)."""
+
+    date: str  # YYYY-MM-DD
+    tz: str | None = None  # UTC offset, e.g. "-05:00"
+    report_data: HealthReportData | None = None
+
+
+class HealthReportsResponse(BaseModel):
+    """Returned by GET /health-reports (live, 2026-11-09, official-parity
+    pass). Required query params are exactly `start_date` / `end_date` (the
+    same misleading 400 code 100 trap as /summaries applies otherwise).
+    The route is the plural /health-reports; /health and /health/reports
+    are 404. Wide ranges are silently truncated upstream to the first 30
+    days of the range (verified live 2026-11-09: a 2026-09-01..2026-11-08
+    request returned only 2026-09-01..2026-09-30), so get_health_reports
+    pages ranges as adjacent non-overlapping 30-day windows."""
+
+    items: list[HealthReportItemModel]
+
+
 class FileMetadata(BaseModel):
     """Nested under FileModel.metadata (live 2026-07)."""
 
