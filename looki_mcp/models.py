@@ -52,6 +52,32 @@ class ProfileResponse(BaseModel):
     kind: int | None = None
 
 
+class MemoryOverviewSummaries(BaseModel):
+    """The summary sections of GET /memory/overview (live, 2026-11-09).
+
+    Each section is a maintained prose summary written by Looki, not an
+    event record. All seven keys were present on the observed payload.
+    """
+
+    identity: str | None = None
+    lifestyle: str | None = None
+    traits: str | None = None
+    interests: str | None = None
+    relationships: str | None = None
+    current_experiences: str | None = None
+    looki_preferences: str | None = None
+
+
+class MemoryOverviewResponse(BaseModel):
+    """Returned by GET /memory/overview (live, 2026-11-09, official-parity
+    pass). A consolidated personal-context summary, not an event timeline.
+    The get_memory_overview tool returns `summaries` and `updated_at` in
+    full; Looki content is never truncated in this server."""
+
+    summaries: MemoryOverviewSummaries
+    updated_at: str | None = None
+
+
 class FileMetadata(BaseModel):
     """Nested under FileModel.metadata (live 2026-07)."""
 

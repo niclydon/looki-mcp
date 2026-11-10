@@ -3,6 +3,16 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Memory overview tool (OB-69894, RP-116)
+
+New tool `get_memory_overview` over `GET /memory/overview`, an endpoint on
+the API-key surface that the official Looki stack (looki-ai/looki-plugin,
+looki-personal-memory skill) documents but this server never wrapped. It
+returns the consolidated personal-context record — `summaries` sections
+identity, lifestyle, traits, interests, relationships,
+current_experiences, looki_preferences, plus `updated_at` — in full.
+models.py documents the shape as MemoryOverviewResponse. Tool count 24 → 25.
+
 ## 2026-11-09 — By-date journal lookup canonicalizes unpadded dates (OB-69852)
 
 `get_journals_by_date` now canonicalizes its `date` argument via the new
