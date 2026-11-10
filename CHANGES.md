@@ -3,6 +3,20 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Contract docs refreshed to the official-parity state (OB-69899, RP-116)
+
+Docs-only. models.py re-stamped with the 2026-11-09 evening
+official-parity pass and an endpoint summary for the four RP-116
+endpoints plus the false routes. New official_parity_api_findings.md
+records the full discovery: the four endpoints with their traps and
+range contracts (summaries 7-day rejection, health-reports silent
+30-day truncation), the false routes (/moments/dates, /journals/dates
+422 path-param captures; singular variants 404), the official stack
+inventory (looki-ai/looki-plugin + looki-ai/looki-skills, hosted OAuth
+MCP at open.looki.ai/mcp, @looki-ai/cli v0.6.1) marked as upstream
+context rather than dependencies, and the probe candidate-generation
+rule (official CLI command table first). No service restart.
+
 ## 2026-11-09 — Composite context tools (OB-69898, RP-116)
 
 New module looki_mcp/tools/composites.py with two composites over the
