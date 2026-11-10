@@ -11,6 +11,7 @@ from mcp.types import Icon
 from starlette.responses import FileResponse, JSONResponse
 
 from looki_mcp.tools.chat import register_chat_tools
+from looki_mcp.tools.composites import register_composite_tools
 from looki_mcp.tools.convenience import register_convenience_tools
 from looki_mcp.tools.highlights import register_highlights_tools
 from looki_mcp.tools.health import register_health_tools
@@ -22,7 +23,7 @@ from looki_mcp.tools.realtime import register_realtime_tools
 from looki_mcp.tools.summaries import register_summaries_tools
 from looki_mcp.tools.video import register_video_tools
 
-TOOL_COUNT = 28
+TOOL_COUNT = 30
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 LOGO_PATH = ASSETS_DIR / "looki-logo.ico"
@@ -82,6 +83,7 @@ register_memory_tools(mcp)
 register_summaries_tools(mcp)
 register_health_tools(mcp)
 register_chat_tools(mcp)
+register_composite_tools(mcp)
 register_moments_tools(mcp)
 register_highlights_tools(mcp)
 register_journals_tools(mcp)
