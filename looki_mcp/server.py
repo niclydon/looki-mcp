@@ -10,6 +10,7 @@ from fastmcp import FastMCP
 from mcp.types import Icon
 from starlette.responses import FileResponse, JSONResponse
 
+from looki_mcp.tools.chat import register_chat_tools
 from looki_mcp.tools.convenience import register_convenience_tools
 from looki_mcp.tools.highlights import register_highlights_tools
 from looki_mcp.tools.health import register_health_tools
@@ -21,7 +22,7 @@ from looki_mcp.tools.realtime import register_realtime_tools
 from looki_mcp.tools.summaries import register_summaries_tools
 from looki_mcp.tools.video import register_video_tools
 
-TOOL_COUNT = 27
+TOOL_COUNT = 28
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 LOGO_PATH = ASSETS_DIR / "looki-logo.ico"
@@ -62,6 +63,7 @@ mcp = FastMCP(
         "(identity, lifestyle, traits, relationships, current experiences). "
         "Use get_summaries for Looki life summaries (daily, weekly, chat, moment) over a date range. "
         "Use get_health_reports for Looki daily health reports (diet, activity metrics, sleep-adjacent estimates) over a date range. "
+        "Use get_chat_history for the user's past conversations with the Looki assistant. "
         "Use search_moments for natural language queries about specific memories. "
         "Use get_moments_calendar or get_recent_activity for activity overview. "
         "Use get_todays_moments for what happened today. "
@@ -79,6 +81,7 @@ register_profile_tools(mcp)
 register_memory_tools(mcp)
 register_summaries_tools(mcp)
 register_health_tools(mcp)
+register_chat_tools(mcp)
 register_moments_tools(mcp)
 register_highlights_tools(mcp)
 register_journals_tools(mcp)
