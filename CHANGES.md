@@ -3,6 +3,18 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Contract probe re-baselined to the official-parity contract (OB-69900, RP-116)
+
+scripts/api_contract_probe.py gains live checks for the four RP-116
+endpoints (/memory/overview, /summaries, /health-reports, /chat/history)
+asserting envelope code 0 and the verified key sets (field names only),
+negative assertions for the false routes (/moments/dates and
+/journals/dates as 422 path-param captures; /summary, /health, /chat,
+/memory as 404), and the /summaries param-trap assertions (missing type
+422; date= -> 400 code 100). The header records the candidate-generation
+rule: future probe candidates come from the official CLI command table
+first, speculative names second. Probe exits 0 against the live API.
+
 ## 2026-11-09 — Contract docs refreshed to the official-parity state (OB-69899, RP-116)
 
 Docs-only. models.py re-stamped with the 2026-11-09 evening
