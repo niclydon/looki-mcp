@@ -3,6 +3,16 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-09 — Chat history tool (OB-69897, RP-116)
+
+New tool `get_chat_history(limit, since, cursor)` over `GET /chat/history`.
+Returns one page of the user's conversations with the Looki assistant —
+items {role, text, created_at} in full — with `has_more` and the opaque
+`next_cursor` passed through for the next call; pagination is never
+fabricated and history is never auto-dumped. Default limit 50 (matches
+the official CLI examples). models.py documents the shape as
+ChatHistoryResponse. Tool count 27 → 28.
+
 ## 2026-11-09 — Health reports tool (OB-69896, RP-116)
 
 New tool `get_health_reports(start_date, end_date)` over
