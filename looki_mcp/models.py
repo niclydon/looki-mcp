@@ -198,8 +198,9 @@ class FileModel(BaseModel):
     Top-level `size` / `duration_ms` are legacy fallbacks (not present on current
     moments/files responses).
     Host observed 2026-11-09: `user-file.looki.ai`, replacing the earlier
-    `devo-user-file.looki.ai` host. The observed JWT expiry remains about
-    one hour for this presigned host.
+    `devo-user-file.looki.ai` host. JWT expiry re-verified live 2026-11-11:
+    exp-iat = 600s (10 minutes) for this host across moment covers, moment
+    files, and journal media, superseding the ~1 hour observed on 2026-11-09.
     """
 
     temporary_url: str
@@ -391,7 +392,7 @@ class JournalMediaFile(BaseModel):
     """The image (or other media) behind a journal media item. AI-generated; only
     `IMAGE` observed in journals so far (VIDEO/AUDIO permitted but unseen)."""
 
-    temporary_url: str  # short-lived JWT (~1 hour observed)
+    temporary_url: str  # short-lived JWT (~10 min; exp-iat = 600s verified 2026-11-11)
     media_type: str  # "IMAGE" per live API
     metadata: FileMetadata | None = None
     size: int | None = None  # legacy
