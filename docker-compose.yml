@@ -11,7 +11,7 @@ services:
         - "CMD"
         - "python"
         - "-c"
-        - "import urllib.request; urllib.request.urlopen('http://localhost:3456/health')"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:${LOOKI_PORT:-3456}/health')"
       interval: 30s
       timeout: 5s
       retries: 3

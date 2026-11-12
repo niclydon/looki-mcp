@@ -3,6 +3,18 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-12 — Docker healthchecks follow LOOKI_PORT (OB-69929)
+
+The Docker route's healthchecks hardcoded `localhost:3456` while the
+server listens on `LOOKI_PORT` (default 3456), so a custom-port deploy
+(e.g. `LOOKI_PORT=7861`, the production port) could never report
+healthy. The Dockerfile healthcheck now reads `LOOKI_PORT` from the
+container environment at runtime (default 3456) and the compose
+healthcheck interpolates `${LOOKI_PORT:-3456}`. `EXPOSE 3456` stays as
+documentation of the default. The Dockerfile install step is unchanged
+pending OB-69924's dependency lock (TODO comment added). Production's
+systemd path is untouched.
+
 ## 2026-11-11 — Ship: the Platform-docs narrative (docs-only)
 
 Narrative-only, written as the ship step of the 2026-11-11
