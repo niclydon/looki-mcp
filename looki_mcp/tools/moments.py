@@ -75,7 +75,7 @@ def register_moments_tools(mcp: FastMCP) -> None:
     ) -> str:
         """
         Returns photos and videos from a specific moment with pagination. Each file
-        includes a temporary URL (valid 1 hour), media type (photo/video), size, and
+        includes a temporary URL (valid ~10 minutes), media type (photo/video), size, and
         optional duration. Use when the user wants to view or reference specific media
         from a memory.
 

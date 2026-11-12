@@ -3,6 +3,22 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-11 — Media URL expiry corrected: 10 minutes, not 1 hour (docs)
+
+Live re-probe on 2026-11-11 (prompted by the new platform.looki.ai API
+Reference, which states 10 minutes) decoded the `x-looki-token` JWTs on
+fresh URLs from three surfaces — moment covers, moment files, and journal
+media, all on `user-file.looki.ai`: exp-iat = 600s in every case. The
+~1 hour expiry observed on 2026-11-09 and recorded in the
+`get_moment_files` tool description, `models.py` (FileModel and
+JournalMediaFile), and `journals_api_findings.md` is superseded; all four
+live claims now state ~10 minutes with the verification date. No code
+behavior changes; the correction matters because consumers handed a
+moment file URL have 10 minutes, not an hour, to fetch or capture it.
+The same probe confirmed summary type `moment` is still live (the
+Platform docs omit it; the API's 422 enum still lists
+'daily', 'weekly', 'chat' or 'moment').
+
 ## 2026-11-10 — RP-116 narrative: the official-parity record (docs-only)
 
 Narrative-only, written as the ship step of track RP-116. The six
