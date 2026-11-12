@@ -22,6 +22,7 @@ from looki_mcp.tools.profile import register_profile_tools
 from looki_mcp.tools.realtime import register_realtime_tools
 from looki_mcp.tools.summaries import register_summaries_tools
 from looki_mcp.tools.video import register_video_tools
+from looki_mcp.version import DEPLOYED_AT, GIT_COMMIT, __version__
 
 TOOL_COUNT = 30
 
@@ -55,7 +56,7 @@ _icons: list[Icon] | None = (
 
 mcp = FastMCP(
     name="looki-mcp",
-    version="1.1.0",
+    version=__version__,
     website_url="https://web.looki.ai",
     icons=_icons,
     instructions=(
@@ -98,7 +99,9 @@ async def health(request) -> JSONResponse:  # type: ignore[no-untyped-def]
         {
             "status": "ok",
             "server": "looki-mcp",
-            "version": "1.1.0",
+            "version": __version__,
+            "git_commit": GIT_COMMIT,
+            "deployed_at": DEPLOYED_AT,
             "tools": TOOL_COUNT,
         }
     )
