@@ -3,6 +3,41 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-11 — Ship: the Platform-docs narrative (docs-only)
+
+Narrative-only, written as the ship step of the 2026-11-11
+platform-docs arc. The code-side change of that arc (the media URL
+expiry correction) landed the same evening under the entry below
+(PR #34, squash-merged `b00eb05`, deployed and live-verified); what
+it did not leave behind was the long-form record, and this entry's
+companion doc supplies it:
+[platform docs and the ten-minute URL](docs/narrative/2026-11-11-platform-docs-and-the-ten-minute-url.md).
+
+The narrative covers the parts the correction's entry could not:
+the inventory of the vendor's new platform.looki.ai site (Agents,
+CLI Reference with its 21 commands, and an OpenAPI 3.1.0 API
+Reference listing the same 14 endpoints this server already
+serves), the parity verdict (no new surface, two detail
+discrepancies), and both discrepancy settlements in full — summary
+type `moment` still live against the docs' omission (200/code 0 in
+two windows; the API's 422 enum quoted verbatim), and the media
+URL expiry probed per surface by decoding fresh `x-looki-token`
+JWTs (exp-iat = 600s on moment covers, moment files, and journal
+media alike), against a recorded history in which that number had
+already moved once (10 minutes in June/July 2026, ~1 hour observed
+2026-11-09). It records the rejected dispositions (a backlog
+filing instead of the direct fix; a contract-probe re-baseline
+against the published spec, deferred until the spec and the live
+API diverge again, with a JWT-ttl assertion named as the addition
+that re-baseline should carry) and the standing lesson: observed
+constants get verification dates, because an undated expiry claim
+is a small lie on a timer.
+
+No runtime code changes, nothing redeploys, and the running
+service is untouched; it already carries the arc's code at
+`b00eb05`, verified by tool list (30) and the corrected
+`get_moment_files` description read live after deploy.
+
 ## 2026-11-11 — Media URL expiry corrected: 10 minutes, not 1 hour (docs)
 
 Live re-probe on 2026-11-11 (prompted by the new platform.looki.ai API
