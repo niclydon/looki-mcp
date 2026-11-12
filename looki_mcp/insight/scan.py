@@ -33,12 +33,12 @@ async def walk_files(client: httpx.AsyncClient, moment_id: str, *, max_calls: in
             break
         params = {"limit": 100}
         if cursor:
-            params["cursor_id"] = cursor
+            params["cursor"] = cursor
         resp = await governed_get(client, f"/moments/{moment_id}/files", params=params)
         calls += 1
         data = unwrap(resp) or {}
         items.extend(data.get("items", []) if isinstance(data, dict) else [])
-        cursor = data.get("next_cursor_id") if isinstance(data, dict) else None
+        cursor = data.get("next_cursor") if isinstance(data, dict) else None
         if not (isinstance(data, dict) and data.get("has_more") and cursor):
             break
     return {"items": items, "calls_used": calls, "capped": capped}
