@@ -77,4 +77,23 @@ for failure in FAIL_IMPORT FAIL_PIP_CHECK; do
   [[ ! -s "$tmp/systemctl.log" ]] || { echo "systemctl ran despite $failure" >&2; exit 1; }
 done
 
+# OB-69924: when the checkout carries requirements.lock, the deploy installs
+# from the lock instead of the floating bounds file.
+printf 'fastmcp==4.1.8\n' > "$seed/requirements.lock"
+git -C "$seed" add requirements.lock
+git -C "$seed" commit -qm lock
+git -C "$seed" push -q origin main
+service_locked="$tmp/service_locked"
+git clone -q "$remote" "$service_locked"
+mkdir -p "$service_locked/.venv/bin"
+cat > "$service_locked/.venv/bin/python" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$tmp/python-lock.log"
+EOF
+chmod +x "$service_locked/.venv/bin/python"
+printf 'LOOKI_PORT=7861\n' > "$service_locked/.env"
+PATH="$bin:$PATH" LOOKI_MCP_SERVICE_DIR="$service_locked" "$repo_root/scripts/deploy.sh" origin/main
+grep -q -- '-m pip install --disable-pip-version-check -r requirements.lock' "$tmp/python-lock.log"
+grep -qx -- '-c import main' "$tmp/python-lock.log"
+
 echo "looki deploy test: ok"
