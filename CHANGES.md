@@ -3,6 +3,25 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-12 — Dependency discipline: lockfile, upper bounds, checkout venv repaired (OB-69924)
+
+Deploys no longer float on the day's pip resolve. `requirements.txt` and
+`pyproject.toml` now carry upper bounds on every direct dependency —
+`fastmcp>=4.1.6,<5`, `httpx>=0.27.0,<1`, `python-dotenv>=1.0.0,<2`,
+`langfuse>=4.0.0,<5`, `boto3>=1.34.0,<2` — with the `langfuse` floor raised
+to the major production actually runs (4.x) and the `fastmcp` floor bumped
+past the 4.1.0 patch pile-up. `requirements.lock` pins the full resolution
+(`uv pip compile requirements.txt --python-version 3.12 -o requirements.lock`;
+fastmcp 4.1.8, currently the latest stable 4.1.x, langfuse 4.18.0), and
+`scripts/deploy.sh` installs from the lock when present, falling back to
+`requirements.txt` otherwise; the OB-65573 import-check gate is untouched.
+`scripts/test_deploy.sh` now covers the lock-install path. The repo checkout
+venv (`~/projects/looki-mcp/.venv`), which had drifted to fastmcp 3.2.4 /
+mcp 1.27.0 against the declared `fastmcp>=4.1.0,<5`, was rebuilt from the
+lock; tests run under the lock-resolved venv (offline suites:
+`scripts/test_*.py` excluding live `test_all_tools.py`). Regenerate the lock
+in the same commit as any bound change.
+
 ## 2026-11-11 — Ship: the Platform-docs narrative (docs-only)
 
 Narrative-only, written as the ship step of the 2026-11-11

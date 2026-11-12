@@ -42,10 +42,22 @@ git clone https://github.com/niclydon/looki-mcp.git
 cd looki-mcp
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.lock
 python main.py setup        # interactive credentials wizard
 python main.py              # start the server
 ```
+
+`requirements.txt` holds the human-readable dependency bounds (every direct
+dependency carries both a lower and an upper bound); `requirements.lock` is the
+pinned resolution the deploy installs from, regenerated from a clean
+Python 3.12 resolution with:
+
+```bash
+uv pip compile requirements.txt --python-version 3.12 -o requirements.lock
+```
+
+After changing a bound, regenerate the lock in the same commit so deploys keep
+carrying the verified resolution instead of floating on the day's pip resolve.
 
 The Looki logo (`assets/looki-logo.ico`) ships with the repo — nothing to fetch.
 
@@ -332,9 +344,9 @@ sudo chown looki:looki /opt/looki-mcp
 git clone https://github.com/niclydon/looki-mcp /opt/looki-mcp
 cd /opt/looki-mcp
 
-# Set up venv + deps
+# Set up venv + deps (installs from the committed lock; see Installation)
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -r requirements.lock
 
 # Configure .env (copy from .env.example, fill in your credentials)
 cp .env.example .env
@@ -446,7 +458,7 @@ error message when this limit is reached so the AI assistant can suggest waiting
 → Confirm `/logo.ico` is accessible: `curl https://your-server.example.com/logo.ico`
 
 **`fastmcp` not found / ImportError on startup**
-→ Activate your virtualenv: `source .venv/bin/activate` and re-run `pip install -r requirements.txt`.
+→ Activate your virtualenv: `source .venv/bin/activate` and re-run `pip install -r requirements.lock`.
 
 ## Project Layout
 
@@ -463,7 +475,8 @@ looki-mcp/
 │   ├── download_logo.py   # Maintenance script — re-fetch logo if Looki updates it
 │   └── smoke_test.py      # Import/registration test (no .env needed)
 ├── main.py                # Entry point
-├── requirements.txt
+├── requirements.txt       # Human-readable dependency bounds (lock source)
+├── requirements.lock      # Pinned resolution the deploy installs from
 ├── pyproject.toml
 ├── .env.example
 ├── Dockerfile
