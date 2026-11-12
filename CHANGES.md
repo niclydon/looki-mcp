@@ -3,6 +3,19 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-12 — /health carries git_commit and version is single-sourced (OB-69923, 1.2.0)
+
+looki_mcp/version.py is the single source of truth for the package version
+(importlib.metadata, then pyproject.toml in the git-in-place checkout, then a
+never-a-release fallback); server.py no longer hardcodes 1.1.0 in either the
+FastMCP constructor or the /health handler. /health is additive: it now reports
+git_commit and deployed_at from .deployed-sha (written by scripts/deploy.sh;
+None when absent in a dev checkout), so deployed-vs-source drift is visible from
+one health call without SSH. Version bumped 1.1.0 -> 1.2.0; tag v1.2.0 lands on
+the merged commit after adversarial review. Note deploy.sh writes
+.deployed-sha after its health check, so a first deploy reports the previous
+sha until the service restarts.
+
 ## 2026-11-11 — Ship: the Platform-docs narrative (docs-only)
 
 Narrative-only, written as the ship step of the 2026-11-11
