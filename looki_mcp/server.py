@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version as _dist_version
 from pathlib import Path
 
 from fastmcp import FastMCP
@@ -23,7 +25,18 @@ from looki_mcp.tools.realtime import register_realtime_tools
 from looki_mcp.tools.summaries import register_summaries_tools
 from looki_mcp.tools.video import register_video_tools
 
+# Fallback tool count (asserted by scripts/smoke_test.py); /health reports the
+# live registered count and only falls back to this if listing fails.
 TOOL_COUNT = 30
+
+# Single source of truth for the version is pyproject.toml, read from the
+# installed distribution metadata. The constant is only a fallback for a bare
+# source checkout that was never pip-installed; keep it equal to pyproject.
+_FALLBACK_VERSION = "1.2.0"
+try:
+    __version__ = _dist_version("looki-mcp")
+except PackageNotFoundError:
+    __version__ = _FALLBACK_VERSION
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 LOGO_PATH = ASSETS_DIR / "looki-logo.ico"
@@ -55,7 +68,7 @@ _icons: list[Icon] | None = (
 
 mcp = FastMCP(
     name="looki-mcp",
-    version="1.1.0",
+    version=__version__,
     website_url="https://web.looki.ai",
     icons=_icons,
     instructions=(
@@ -92,14 +105,47 @@ register_video_tools(mcp)
 register_convenience_tools(mcp)
 
 
+SERVICE_ROOT = Path(__file__).parent.parent
+DEPLOYED_SHA_PATH = SERVICE_ROOT / ".deployed-sha"
+
+
+def _deploy_stamp() -> tuple[str, str]:
+    """Return (commit, deployed_at) for /health.
+
+    scripts/deploy.sh writes the deployed SHA to .deployed-sha at the service
+    root; its mtime is the deploy time. LOOKI_MCP_COMMIT overrides the commit
+    (e.g. container builds). Mirrors looki-mcp-worker's git_commit/deployed_at,
+    with "unknown" when nothing is stamped.
+    """
+    commit = os.environ.get("LOOKI_MCP_COMMIT", "").strip()
+    deployed_at = "unknown"
+    try:
+        st = DEPLOYED_SHA_PATH.stat()
+        deployed_at = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        if not commit:
+            commit = DEPLOYED_SHA_PATH.read_text().strip()
+    except OSError:
+        pass
+    return commit or "unknown", deployed_at
+
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request) -> JSONResponse:  # type: ignore[no-untyped-def]
+    try:
+        tool_count = len(await mcp._list_tools())
+    except Exception:  # noqa: BLE001 - health must not fail on introspection
+        tool_count = TOOL_COUNT
+    commit, deployed_at = _deploy_stamp()
     return JSONResponse(
         {
             "status": "ok",
             "server": "looki-mcp",
-            "version": "1.1.0",
-            "tools": TOOL_COUNT,
+            "version": __version__,
+            "tools": tool_count,
+            "commit": commit,
+            "deployed_at": deployed_at,
         }
     )
 

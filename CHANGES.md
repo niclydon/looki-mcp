@@ -3,6 +3,18 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-13 — /health reports commit and deploy time (OB-69923)
+
+`/health` returned only `{status, server, version, tools}` and the version
+`1.1.0` was hardcoded in three places. The version now has one source
+(`pyproject.toml`, read via `importlib.metadata`, with a fallback constant for
+un-installed checkouts) and is bumped to 1.2.0 for the journals, composite and
+parity work merged since 1.1.0. `tools` is the live registered count. `/health`
+also returns `commit` (`LOOKI_MCP_COMMIT`, else `.deployed-sha` written by
+`scripts/deploy.sh`, else `unknown`) and `deployed_at` (UTC mtime of
+`.deployed-sha`, else `unknown`), matching looki-mcp-worker's
+`git_commit`/`deployed_at`. Covered by `scripts/test_health_endpoint.py`.
+
 ## 2026-11-12 — Docker healthchecks follow LOOKI_PORT (OB-69929)
 
 The Docker route's healthchecks hardcoded `localhost:3456` while the
