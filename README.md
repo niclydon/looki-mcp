@@ -289,6 +289,24 @@ The server validates your credentials before accepting connections — if anythi
 wrong (missing var, malformed API key, unreachable base URL), it exits with a clear
 error message explaining what to fix.
 
+## Development
+
+Run the offline test suite with the single gate command every lane and
+`scripts/deploy.sh` use (OB-69925). It runs each `scripts/test_*.py` offline
+suite plus `compileall`, and exits nonzero if any suite fails:
+
+```bash
+bash scripts/run_offline_tests.sh   # or: scripts/run_offline_tests.sh
+```
+
+- Suite list is an explicit allowlist in the script (22 suites); new offline
+  suites must be added there. `scripts/test_all_tools.py` (live — needs real
+  Looki credentials) and `scripts/test_deploy.sh` (deploy machinery) are
+  excluded by design.
+- `scripts/deploy.sh` runs this gate before restarting the service; a red
+  suite means no deploy and the old process keeps serving.
+- In PR evidence, name this script and its exit status (e.g. "`scripts/run_offline_tests.sh` exit 0, 22/22 suites passed") so a reviewer can re-run it verbatim.
+
 ## Connecting to Claude
 
 ### claude.ai
