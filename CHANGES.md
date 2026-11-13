@@ -3,6 +3,29 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-12 — Insight composite tools resurrected (OB-69926, RP-117)
+
+The three Insight composites built in RP-57 and archived unmerged
+(`archive/feat-insight-tools-pr2`, tip `f2f6b8e`) are ported file by file
+onto current main: `commitment_harvester`, `the_unwritten`,
+`places_of_my_life`, plus the `insight/journal_mine.py` extractor. They
+return the `{data, narrative, meta}` envelope; `narrative` is filled only
+when an LLM provider is configured and is null otherwise.
+
+Reconciled with what changed since July: `the_unwritten` reads journals
+from the paged `GET /journals` feed via `insight.scan.walk_journals`
+instead of the retired `GET /journals/by_date`; `places_of_my_life` uses
+main's `insight.geo` (JSON address strings collapse to a locality label)
+and drops the archived no-op `deep` flag; moment `audio_summary` goes
+through the shared `audio_summary` normalizer. No content is truncated:
+mined commitment text, moment descriptions, and audio summaries are
+returned in full. The harvester mines `YESTERDAY_RECAP`, `AUDIO_SUMMARY`
+and `MANUAL_AUDIO_SUMMARY` (text types per the 2026-11-09 contract);
+`the_unwritten` counts a day as written only for event-level entries
+(`DIARY`, audio summaries, `STORYBOARD`), not media-only types. The
+archived memory registrar is renamed `register_insight_memory_tools` to
+avoid colliding with `tools/memory.py`. Tool count 30 → 33.
+
 ## 2026-11-12 — Docker healthchecks follow LOOKI_PORT (OB-69929)
 
 The Docker route's healthchecks hardcoded `localhost:3456` while the
