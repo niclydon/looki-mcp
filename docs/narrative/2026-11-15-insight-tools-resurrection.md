@@ -37,9 +37,9 @@ file instead of merging it:
 - All three return the `{data, narrative, meta}` envelope, with
   `narrative` null when no LLM provider is configured. Nothing is
   truncated.
-- `TOOL_COUNT` went from 30 to 33, and the README tool table and
-  `CHANGES.md` were updated in the same PR, so this closeout did not
-  need to touch either.
+- `TOOL_COUNT` went from 30 to 33, and the README count and tool
+  table were updated in the same PR, so this closeout leaves the README
+  alone and only adds its own `CHANGES.md` entry.
 
 ## Re-verification, live
 
@@ -50,12 +50,16 @@ The deploy (`scripts/deploy.sh`) put `4c62eca` into
 2026-11-15. Each tool was then called against the operator's own
 account on 2026-11-15 (about 04:55 UTC). Only shapes and counts are
 recorded here; the content is the operator's own life and stays out of
-the repo.
+the repo. The windows are anchored to account-local dates, and this run
+fell minutes before local midnight, so a re-run with the same arguments
+later returns different moment counts. The durable evidence is the
+envelope, the field shapes and the harvester counters, which a review
+re-run reproduced exactly.
 
 | Tool | Arguments | Result |
 |---|---|---|
 | `places_of_my_life` | `days=3`, `top_n=3` | 3 places returned of 4 distinct, 58 moments, `unknown_count` 0; each place has `visits`, `total_seconds` and a `sample_moment`; meta `calls_used` 4, `days_scanned` 4 |
-| `the_unwritten` | `days=2`, `min_significance=4` | `unwritten` empty: all 46 moments fall on 4 dates that already have an event-level entry; `covering_types` lists the four event types; meta `days_scanned` 3 |
+| `the_unwritten` | `days=2`, `min_significance=4` | `unwritten` empty; `total_moments` 46 over the 3 scanned days, all on covered dates; `written_dates` 4; `covering_types` lists the four event types; meta `days_scanned` 3 |
 | `commitment_harvester` | `days=1` | 18 items from 2 mined entries (one `AUDIO_SUMMARY`, one `YESTERDAY_RECAP`), every item `parsed_section: false`; `unparsed_entries` 2 |
 
 All three came back with `narrative: null`, `cache_hit: false` and
@@ -88,11 +92,12 @@ commitments.
 
 ## Not done here
 
-- The local-looki Muse skill doc still describes the 30-tool surface.
-  It is a separate surface and needs its own refresh to 33 tools; this
-  OB only flags it.
+- The local-looki Muse skill doc still describes 24 tools (its header
+  says "verified live 2026-10-16"), so it predates even the 30-tool
+  surface. It is a separate surface and needs its own refresh to 33
+  tools; this OB only flags it.
 - PR #38 (dependency lock, OB-69924) merged after the `4c62eca` deploy
   and is not yet live.
 
 See `CHANGES.md` (2026-11-15 entry) for the chronological summary, and
-the 2026-11-12 entry for the port itself.
+the 2026-11-12 OB-69926 entry for the port itself.
