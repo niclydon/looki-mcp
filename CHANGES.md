@@ -3,6 +3,21 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-15 — Insight tools live-verified; harvester fallback flagged (OB-69927)
+
+Closeout for RP-117. The three resurrected Insight tools are live at
+`4c62eca` (`/health` reports `tools=33`) and each was smoke-called
+against the operator's account on 2026-11-15: `places_of_my_life`
+(3 of 4 distinct places, 58 moments), `the_unwritten` (empty for a
+two-day window whose 4 dates all have event-level entries) and
+`commitment_harvester` (18 items from 2 entries). Every harvester item
+came through the unparsed fallback, so on current journal formats it
+returns whole entries rather than commitments; filed as a follow-up.
+The local-looki Muse skill still describes 30 tools and needs its own
+refresh. README and the tool table were already updated in #43.
+
+Full story: docs/narrative/2026-11-15-insight-tools-resurrection.md
+
 ## 2026-11-12 — Dependency discipline: lockfile, upper bounds, checkout venv repaired (OB-69924)
 
 Deploys no longer float on the day's pip resolve. `requirements.txt` and
