@@ -188,6 +188,57 @@ def _snippet(text: str, query: str, radius: int = 80) -> str:
     return snippet
 
 
+def _search_terms(query: str) -> list[str]:
+    """Splits a search query into lowercase terms (any-order AND semantics).
+
+    A whitespace-only query falls back to the raw lowercased needle so the
+    degenerate case keeps its old exact-substring meaning instead of matching
+    every entry via ``all([])``.
+    """
+    terms = query.lower().split()
+    return terms if terms else [query.lower()]
+
+
+def _entry_search_match(entry: dict, terms: list[str]) -> tuple[bool, str | None, str]:
+    """Checks whether an entry contains ALL terms in any order across
+    title/description/content.
+
+    Returns ``(matched, matched_field, snippet_term)`` where ``matched_field``
+    is the field with the most distinct term hits (ties keep the older
+    title -> description -> content order, so a single-term query picks the
+    same field the old exact-phrase scan picked) and ``snippet_term`` is the
+    first term in query order present in that field. ``(False, None, "")``
+    when any term is missing from all three fields. Content is never
+    truncated: this only decides the locator match, the full entry is still
+    returned via _shape_entry.
+    """
+    field_values: dict[str, str] = {}
+    field_lowers: dict[str, str] = {}
+    for field in ("title", "description", "content"):
+        value = entry.get(field)
+        if isinstance(value, str):
+            field_values[field] = value
+            field_lowers[field] = value.lower()
+    if not field_lowers:
+        return False, None, ""
+    haystack = " ".join(field_lowers[f] for f in ("title", "description", "content") if f in field_lowers)
+    if not all(term in haystack for term in terms):
+        return False, None, ""
+    best_field: str | None = None
+    best_hits = -1
+    for field in ("title", "description", "content"):
+        lowered = field_lowers.get(field)
+        if lowered is None:
+            continue
+        hits = sum(1 for term in terms if term in lowered)
+        if hits > best_hits:
+            best_hits = hits
+            best_field = field
+    assert best_field is not None
+    snippet_term = next(t for t in terms if t in field_lowers[best_field])
+    return True, best_field, snippet_term
+
+
 def _bucket_count(data: Any) -> int:
     if isinstance(data, list):
         return len(data)
@@ -665,14 +716,15 @@ def register_journals_tools(mcp: FastMCP) -> None:
     @mcp.tool
     async def search_journals(query: str, days: int = 31, max_results: int = 10) -> str:
         """
-        Finds journal entries whose title, description, or content contain the query
-        (case-insensitive substring match) within the recent `days` window. Looki has no
-        server-side journal search, so this is a local locator: it returns matched entries
-        with a snippet and id — use get_journal_entry to read a full match. Only searches
-        the recent window; widen `days` (max 31) or use backfill_journals for deep history.
+        Finds journal entries whose title, description, or content contain ALL of the
+        query terms in any order (case-insensitive substring match per term) within
+        the recent `days` window. Looki has no server-side journal search, so this is
+        a local locator: it returns matched entries with a snippet and id — use
+        get_journal_entry to read a full match. Only searches the recent window;
+        widen `days` (max 31) or use backfill_journals for deep history.
 
         Args:
-            query: Text to find. Between 1 and 100 characters.
+            query: Text to find, split into terms on whitespace. Between 1 and 100 characters.
             days: How many recent days to search. Between 1 and 31, default 31.
             max_results: Maximum matches to return. Between 1 and 25, default 10.
         """
@@ -682,7 +734,7 @@ def register_journals_tools(mcp: FastMCP) -> None:
             return "Error: days must be between 1 and 31."
         if not (1 <= max_results <= 25):
             return "Error: max_results must be between 1 and 25."
-        needle = query.lower()
+        terms = _search_terms(query)
         try:
             async with get_client() as client:
                 response = await client.get("/journals", params={"max_days": days})
@@ -690,14 +742,13 @@ def register_journals_tools(mcp: FastMCP) -> None:
             entries = _flatten_buckets(data)
             matches: list[dict] = []
             for entry in entries:
-                for field in ("title", "description", "content"):
-                    value = entry.get(field)
-                    if isinstance(value, str) and needle in value.lower():
-                        shaped = _shape_entry(entry, "summary")
-                        shaped["matched_field"] = field
-                        shaped["snippet"] = _snippet(value, query)
-                        matches.append(shaped)
-                        break
+                matched, field, snippet_term = _entry_search_match(entry, terms)
+                if matched:
+                    assert field is not None
+                    shaped = _shape_entry(entry, "summary")
+                    shaped["matched_field"] = field
+                    shaped["snippet"] = _snippet(entry[field], snippet_term)
+                    matches.append(shaped)
             out = {
                 "query": query,
                 "window_days": days,

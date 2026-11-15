@@ -17,7 +17,11 @@ git -C "$seed" config user.email test@example.invalid
 git -C "$seed" config user.name test
 printf 'fastmcp\n' > "$seed/requirements.txt"
 cp "$repo_root/.gitignore" "$seed/.gitignore"
-git -C "$seed" add requirements.txt .gitignore
+mkdir -p "$seed/scripts"
+cp "$repo_root/scripts/run_offline_tests.sh" "$seed/scripts/run_offline_tests.sh"
+chmod +x "$seed/scripts/run_offline_tests.sh"
+cp "$repo_root"/scripts/test_*.py "$seed/scripts/"
+git -C "$seed" add requirements.txt .gitignore scripts/
 git -C "$seed" commit -qm initial
 git -C "$seed" remote add origin "$remote"
 git -C "$seed" push -q -u origin main
@@ -30,6 +34,7 @@ printf '%s\n' "\$*" >> "$tmp/python.log"
 case "\$*" in
   *"pip check"*) [[ -z "\${FAIL_PIP_CHECK:-}" ]] ;;
   "-c import main") [[ -z "\${FAIL_IMPORT:-}" ]] ;;
+  *"test_"*".py"|*"compileall"*) [[ -z "\${FAIL_OFFLINE_GATE:-}" ]] ;;
 esac
 EOF
 chmod +x "$service/.venv/bin/python"
@@ -55,6 +60,8 @@ PATH="$bin:$PATH" LOOKI_MCP_SERVICE_DIR="$service" "$repo_root/scripts/deploy.sh
 grep -q -- '-m pip install --disable-pip-version-check -r requirements.txt' "$tmp/python.log"
 grep -q -- '-m pip check --disable-pip-version-check' "$tmp/python.log"
 grep -qx -- '-c import main' "$tmp/python.log"
+grep -q 'scripts/test_cache.py' "$tmp/python.log"
+grep -q -- '-m compileall' "$tmp/python.log"
 grep -q '^restart looki-mcp.service$' "$tmp/systemctl.log"
 grep -q '^is-active --quiet looki-mcp.service$' "$tmp/systemctl.log"
 [[ "$(cat "$service/.deployed-sha")" == "$(git -C "$service" rev-parse HEAD)" ]]
@@ -64,9 +71,10 @@ grep -q '^is-active --quiet looki-mcp.service$' "$tmp/systemctl.log"
 PATH="$bin:$PATH" LOOKI_MCP_SERVICE_DIR="$service" "$repo_root/scripts/deploy.sh" origin/main
 [[ -z "$(git -C "$service" status --porcelain)" ]]
 
-# OB-65573: a venv that fails pip check or cannot import main.py aborts the
-# deploy before the restart, so the old process keeps serving.
-for failure in FAIL_IMPORT FAIL_PIP_CHECK; do
+# OB-65573 / OB-69925: a venv that fails pip check or cannot import main.py,
+# or a red offline test gate, aborts the deploy before the restart, so the
+# old process keeps serving.
+for failure in FAIL_IMPORT FAIL_PIP_CHECK FAIL_OFFLINE_GATE; do
   : > "$tmp/systemctl.log"
   if env "$failure=1" PATH="$bin:$PATH" LOOKI_MCP_SERVICE_DIR="$service" \
       "$repo_root/scripts/deploy.sh" origin/main 2> "$tmp/deploy.err"; then
