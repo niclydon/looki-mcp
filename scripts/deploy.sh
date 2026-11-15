@@ -24,7 +24,17 @@ SHA="$(git rev-parse HEAD)"
 log "checked out $SHA"
 
 log "installing Python requirements"
-"$SERVICE_DIR/.venv/bin/python" -m pip install --disable-pip-version-check -r requirements.txt
+# OB-69924: deploys install from the committed lock when present so the
+# release carries the exact verified resolution instead of floating on
+# whatever pip resolves that day. requirements.txt stays the human-readable
+# bounds source the lock is generated from.
+if [[ -f requirements.lock ]]; then
+    log "requirements.lock found; installing from the lock"
+    "$SERVICE_DIR/.venv/bin/python" -m pip install --disable-pip-version-check -r requirements.lock
+else
+    log "no requirements.lock; installing from requirements.txt"
+    "$SERVICE_DIR/.venv/bin/python" -m pip install --disable-pip-version-check -r requirements.txt
+fi
 
 # Check the installed venv before touching the running service: an in-place
 # upgrade can leave a package unimportable (fastmcp 3.x -> 4.x split, OB-65573),
