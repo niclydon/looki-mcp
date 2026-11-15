@@ -11,10 +11,14 @@ def test_iter_dates_inclusive():
 
 def test_walk_files_paginates_and_caps():
     pages = {None: ("c1", [1,2]), "c1": ("c2", [3,4]), "c2": (None, [5])}
+    requests = []
     def handler(request):
-        cur = request.url.params.get("cursor_id")
+        params = dict(request.url.params)
+        requests.append(params)
+        assert "cursor_id" not in params
+        cur = request.url.params.get("cursor")
         nxt, items = pages[cur]
-        return httpx.Response(200, json={"code":0,"detail":"ok","data":{"items":items,"next_cursor_id":nxt,"has_more":nxt is not None}})
+        return httpx.Response(200, json={"code":0,"detail":"ok","data":{"items":items,"next_cursor":nxt,"has_more":nxt is not None}})
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://x") as c:
             full = await scan.walk_files(c, "M1", max_calls=10)
@@ -24,6 +28,9 @@ def test_walk_files_paginates_and_caps():
     assert full["items"] == [1,2,3,4,5] and full["capped"] is None
     assert capped["calls_used"] == 2 and capped["capped"] == "budget"
     assert capped["items"] == [1,2,3,4]
+    assert requests[0] == {"limit": "100"}
+    assert requests[1]["cursor"] == "c1"
+    assert requests[2]["cursor"] == "c2"
 
 def test_walk_journals_chunks_and_caps():
     call_count = [0]

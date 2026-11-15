@@ -12,7 +12,7 @@ memories, moments, photos, AI-generated highlights, and written journal entries.
 ## What It Does
 
 Looki L1 is a wearable camera that passively captures your daily life. This MCP server
-exposes your Looki data through 24 tools that AI assistants can use to answer questions like:
+exposes your Looki data through 33 tools that AI assistants can use to answer questions like:
 
 - "What did I do last Thursday?"
 - "Find the moment where I was at the coffee shop"
@@ -282,12 +282,30 @@ Expected startup output:
 ```
 looki-mcp: Verifying Looki base URL...
 looki-mcp: Base URL verified OK.
-[looki-mcp] Server running on http://0.0.0.0:3456/mcp (24 tools)
+[looki-mcp] Server running on http://0.0.0.0:3456/mcp (33 tools)
 ```
 
 The server validates your credentials before accepting connections — if anything is
 wrong (missing var, malformed API key, unreachable base URL), it exits with a clear
 error message explaining what to fix.
+
+## Development
+
+Run the offline test suite with the single gate command every lane and
+`scripts/deploy.sh` use (OB-69925). It runs each `scripts/test_*.py` offline
+suite plus `compileall`, and exits nonzero if any suite fails:
+
+```bash
+bash scripts/run_offline_tests.sh   # or: scripts/run_offline_tests.sh
+```
+
+- Suite list is an explicit allowlist in the script (22 suites); new offline
+  suites must be added there. `scripts/test_all_tools.py` (live — needs real
+  Looki credentials) and `scripts/test_deploy.sh` (deploy machinery) are
+  excluded by design.
+- `scripts/deploy.sh` runs this gate before restarting the service; a red
+  suite means no deploy and the old process keeps serving.
+- In PR evidence, name this script and its exit status (e.g. "`scripts/run_offline_tests.sh` exit 0, 22/22 suites passed") so a reviewer can re-run it verbatim.
 
 ## Connecting to Claude
 
@@ -371,6 +389,15 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
 | `get_profile` | User profile (name, email, timezone) | — |
+| `get_memory_overview` | Consolidated Looki memory overview (identity, lifestyle, traits, relationships, current experiences) | — |
+| `get_summaries` | Looki life summaries (daily/weekly/chat/moment) over a date range; long ranges paged in 7-day windows | `start_date`, `end_date`, `type` |
+| `get_health_reports` | Looki daily health reports (diet, activity metrics, estimates); long ranges paged in 30-day windows | `start_date`, `end_date` |
+| `get_chat_history` | Past conversations with the Looki assistant (cursor-paged) | `limit`, `since`, `cursor` |
+| `get_day_context` | One date assembled across record types (moments, daily summary, health report, journals), per-section failure isolation | `date` |
+| `get_personal_context` | Standing context: memory overview + latest daily + latest weekly summary | — |
+| `commitment_harvester` | To-do list mined from Actionable Suggestions / TODO lines in recent YESTERDAY_RECAP and audio-summary journals, by date | `days` |
+| `the_unwritten` | Significant moments on days with no event-level journal entry (the gaps in your story) | `days`, `min_significance` |
+| `places_of_my_life` | Places ranked by visits and time spent, from moment cover locations | `days`, `top_n` |
 | `get_moments_calendar` | Calendar view of active days | `start_date`, `end_date` |
 | `get_moments_by_date` | All moments on a specific date | `date` |
 | `get_moment_details` | Full details for one moment | `moment_id` |
@@ -411,7 +438,7 @@ the server works unchanged.
 
 ```
 GET /health
-{"status":"ok","server":"looki-mcp","version":"1.1.0","tools":24}
+{"status":"ok","server":"looki-mcp","version":"1.1.0","tools":33}
 ```
 
 Useful for Docker healthchecks, load balancers, and uptime monitoring.

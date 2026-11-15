@@ -3,6 +3,205 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-12 — Insight composite tools resurrected (OB-69926, RP-117)
+
+The three Insight composites built in RP-57 and archived unmerged
+(`archive/feat-insight-tools-pr2`, tip `f2f6b8e`) are ported file by file
+onto current main: `commitment_harvester`, `the_unwritten`,
+`places_of_my_life`, plus the `insight/journal_mine.py` extractor. They
+return the `{data, narrative, meta}` envelope; `narrative` is filled only
+when an LLM provider is configured and is null otherwise.
+
+Reconciled with what changed since July: `the_unwritten` reads journals
+from the paged `GET /journals` feed via `insight.scan.walk_journals`
+instead of the retired `GET /journals/by_date`; `places_of_my_life` uses
+main's `insight.geo` (JSON address strings collapse to a locality label)
+and drops the archived no-op `deep` flag; moment `audio_summary` goes
+through the shared `audio_summary` normalizer. No content is truncated:
+mined commitment text, moment descriptions, and audio summaries are
+returned in full. The harvester mines `YESTERDAY_RECAP`, `AUDIO_SUMMARY`
+and `MANUAL_AUDIO_SUMMARY` (text types per the 2026-11-09 contract);
+`the_unwritten` counts a day as written only for event-level entries
+(`DIARY`, audio summaries, `STORYBOARD`), not media-only types. The
+archived memory registrar is renamed `register_insight_memory_tools` to
+avoid colliding with `tools/memory.py`. Tool count 30 → 33.
+
+## 2026-11-12 — Docker healthchecks follow LOOKI_PORT (OB-69929)
+
+The Docker route's healthchecks hardcoded `localhost:3456` while the
+server listens on `LOOKI_PORT` (default 3456), so a custom-port deploy
+(e.g. `LOOKI_PORT=7861`, the production port) could never report
+healthy. The Dockerfile healthcheck now reads `LOOKI_PORT` from the
+container environment at runtime (default 3456) and the compose
+healthcheck interpolates `${LOOKI_PORT:-3456}`. `EXPOSE 3456` stays as
+documentation of the default. The Dockerfile install step is unchanged
+pending OB-69924's dependency lock (TODO comment added). Production's
+systemd path is untouched.
+
+## 2026-11-11 — Ship: the Platform-docs narrative (docs-only)
+
+Narrative-only, written as the ship step of the 2026-11-11
+platform-docs arc. The code-side change of that arc (the media URL
+expiry correction) landed the same evening under the entry below
+(PR #34, squash-merged `b00eb05`, deployed and live-verified); what
+it did not leave behind was the long-form record, and this entry's
+companion doc supplies it:
+[platform docs and the ten-minute URL](docs/narrative/2026-11-11-platform-docs-and-the-ten-minute-url.md).
+
+The narrative covers the parts the correction's entry could not:
+the inventory of the vendor's new platform.looki.ai site (Agents,
+CLI Reference with its 21 commands, and an OpenAPI 3.1.0 API
+Reference listing the same 14 endpoints this server already
+serves), the parity verdict (no new surface, two detail
+discrepancies), and both discrepancy settlements in full — summary
+type `moment` still live against the docs' omission (200/code 0 in
+two windows; the API's 422 enum quoted verbatim), and the media
+URL expiry probed per surface by decoding fresh `x-looki-token`
+JWTs (exp-iat = 600s on moment covers, moment files, and journal
+media alike), against a recorded history in which that number had
+already moved once (10 minutes in June/July 2026, ~1 hour observed
+2026-11-09). It records the rejected dispositions (a backlog
+filing instead of the direct fix; a contract-probe re-baseline
+against the published spec, deferred until the spec and the live
+API diverge again, with a JWT-ttl assertion named as the addition
+that re-baseline should carry) and the standing lesson: observed
+constants get verification dates, because an undated expiry claim
+is a small lie on a timer.
+
+No runtime code changes, nothing redeploys, and the running
+service is untouched; it already carries the arc's code at
+`b00eb05`, verified by tool list (30) and the corrected
+`get_moment_files` description read live after deploy.
+
+## 2026-11-11 — Media URL expiry corrected: 10 minutes, not 1 hour (docs)
+
+Live re-probe on 2026-11-11 (prompted by the new platform.looki.ai API
+Reference, which states 10 minutes) decoded the `x-looki-token` JWTs on
+fresh URLs from three surfaces — moment covers, moment files, and journal
+media, all on `user-file.looki.ai`: exp-iat = 600s in every case. The
+~1 hour expiry observed on 2026-11-09 and recorded in the
+`get_moment_files` tool description, `models.py` (FileModel and
+JournalMediaFile), and `journals_api_findings.md` is superseded; all four
+live claims now state ~10 minutes with the verification date. No code
+behavior changes; the correction matters because consumers handed a
+moment file URL have 10 minutes, not an hour, to fetch or capture it.
+The same probe confirmed summary type `moment` is still live (the
+Platform docs omit it; the API's 422 enum still lists
+'daily', 'weekly', 'chat' or 'moment').
+
+## 2026-11-10 — RP-116 narrative: the official-parity record (docs-only)
+
+Narrative-only, written as the ship step of track RP-116. The six
+parity tools themselves landed on 2026-11-09 under the entries below
+(OB-69894 through OB-69900, PRs #26-#32, deployed at `1e0d4dc`); what
+they did not leave behind at close was the long-form record, and this
+entry's companion doc supplies it:
+[official parity RP-116](docs/narrative/2026-11-10-official-parity-rp116.md).
+
+The narrative covers the parts the per-tool entries could not: the
+official stack inventory (two public repos under `looki-ai`, the
+hosted OAuth MCP, the npm CLI), the OAuth wall in front of the
+hosted server's unpublished tool list, and why the enumeration is
+an open item rather than a blocker. It records the discovery rule
+the pack bought with a miss (the 2026-11-09 morning probe's
+speculative path list skipped four endpoints whose names it did not
+guess; the official CLI command table is now the probe's candidate
+generator of record, ahead of speculation), the four verified
+endpoint contracts including the 7-day summaries rejection and the
+silent 30-day health truncation, and the three rejected options
+(hosted-OAuth migration, CLI as a runtime dependency, waiting on
+the enumeration) with their reasons.
+
+It also corrects the pack brief's arithmetic in the record: six
+tools were added to a 24-tool server, and the deployed count is 30.
+The upstream watch enrollment (nightly digest: the `looki-ai` org
+plus both repos; the npm-only CLI named as the known watch gap)
+closes the doc. No runtime code changes, nothing redeploys, and the
+running service is untouched; it already carries the pack's code at
+`1e0d4dc`, verified by tool list (30) and a live weekly-summaries
+call. The downstream half of RP-116, the Nexus ingest and medallion
+walk over these same four record types, is recorded in the nexus
+repo at `docs/narrative/2026-11-10-looki-ingest-medallion-rp116.md`.
+
+## 2026-11-09 — Contract probe re-baselined to the official-parity contract (OB-69900, RP-116)
+
+scripts/api_contract_probe.py gains live checks for the four RP-116
+endpoints (/memory/overview, /summaries, /health-reports, /chat/history)
+asserting envelope code 0 and the verified key sets (field names only),
+negative assertions for the false routes (/moments/dates and
+/journals/dates as 422 path-param captures; /summary, /health, /chat,
+/memory as 404), and the /summaries param-trap assertions (missing type
+422; date= -> 400 code 100). The header records the candidate-generation
+rule: future probe candidates come from the official CLI command table
+first, speculative names second. Probe exits 0 against the live API.
+
+## 2026-11-09 — Contract docs refreshed to the official-parity state (OB-69899, RP-116)
+
+Docs-only. models.py re-stamped with the 2026-11-09 evening
+official-parity pass and an endpoint summary for the four RP-116
+endpoints plus the false routes. New official_parity_api_findings.md
+records the full discovery: the four endpoints with their traps and
+range contracts (summaries 7-day rejection, health-reports silent
+30-day truncation), the false routes (/moments/dates, /journals/dates
+422 path-param captures; singular variants 404), the official stack
+inventory (looki-ai/looki-plugin + looki-ai/looki-skills, hosted OAuth
+MCP at open.looki.ai/mcp, @looki-ai/cli v0.6.1) marked as upstream
+context rather than dependencies, and the probe candidate-generation
+rule (official CLI command table first). No service restart.
+
+## 2026-11-09 — Composite context tools (OB-69898, RP-116)
+
+New module looki_mcp/tools/composites.py with two composites over the
+RP-116 record tools. `get_day_context(date)` returns one date as labeled
+sections (moments index-level, daily summary, health report, journals in
+summary mode via the bounded feed scan). `get_personal_context()` returns
+the memory overview plus the most recent daily summary (7-day window)
+and weekly summary (28-day window). Every section is labeled with its
+source record type, a failing ingredient surfaces as that section's
+`error` without failing the call, and section content is in full.
+Tool count 28 → 30.
+
+## 2026-11-09 — Chat history tool (OB-69897, RP-116)
+
+New tool `get_chat_history(limit, since, cursor)` over `GET /chat/history`.
+Returns one page of the user's conversations with the Looki assistant —
+items {role, text, created_at} in full — with `has_more` and the opaque
+`next_cursor` passed through for the next call; pagination is never
+fabricated and history is never auto-dumped. Default limit 50 (matches
+the official CLI examples). models.py documents the shape as
+ChatHistoryResponse. Tool count 27 → 28.
+
+## 2026-11-09 — Health reports tool (OB-69896, RP-116)
+
+New tool `get_health_reports(start_date, end_date)` over
+`GET /health-reports`. Items are {date, tz, report_data} with report_data
+(summary, calorie, daily_metrics, dietary_review, events, time_range)
+returned in full. Verified live: wide ranges are silently truncated
+upstream to the first 30 days of the range, so longer ranges are paged
+as adjacent non-overlapping 30-day windows and merged. models.py
+documents the shape as HealthReportsResponse. Tool count 26 → 27.
+
+## 2026-11-09 — Life summaries tool (OB-69895, RP-116)
+
+New tool `get_summaries(start_date, end_date, type)` over `GET /summaries`,
+with type in daily | weekly | chat | moment (lowercase, validated
+client-side). Summaries are a distinct record type from journals. Verified
+live range contract: spans over 7 days are rejected for the daily-type
+records (HTTP 400, code 100), so longer ranges are paged as adjacent
+non-overlapping 7-day windows and merged; the required params are exactly
+`start_date`/`end_date`. Items return in full. models.py documents the
+shape as SummariesResponse. Tool count 25 → 26.
+
+## 2026-11-09 — Memory overview tool (OB-69894, RP-116)
+
+New tool `get_memory_overview` over `GET /memory/overview`, an endpoint on
+the API-key surface that the official Looki stack (looki-ai/looki-plugin,
+looki-personal-memory skill) documents but this server never wrapped. It
+returns the consolidated personal-context record — `summaries` sections
+identity, lifestyle, traits, interests, relationships,
+current_experiences, looki_preferences, plus `updated_at` — in full.
+models.py documents the shape as MemoryOverviewResponse. Tool count 24 → 25.
+
 ## 2026-11-09 — By-date journal lookup canonicalizes unpadded dates (OB-69852)
 
 `get_journals_by_date` now canonicalizes its `date` argument via the new
@@ -21,6 +220,13 @@ Arbitrary-date journal scans now report `scan_capped=true` when Looki repeats
 the same cursor before the requested date is reached. Date inputs accepted by
 `strptime` are normalized with `date().isoformat()` so leading-zero years keep
 the canonical `YYYY-MM-DD` shape used by date comparisons.
+
+## 2026-11-09 — Send moment-file pagination cursor under the live API key (OB-69857)
+
+`get_moment_files` continues accepting its existing `cursor_id` input for
+backward compatibility, while forwarding that value to Looki as the `cursor`
+query parameter. An offline regression script checks the request path and
+ensures `cursor_id` is never sent on the wire.
 
 ## 2026-11-09 — Looki content is never truncated (operator rule)
 
@@ -51,6 +257,40 @@ six pages (186 feed days). The responses report scan pages and whether the
 window was capped; the existing tool names, arguments, timezone behavior, and
 entry shaping remain intact. Recorded-payload tests cover a present date, an
 absent date, a match on the second page, and the scan cap.
+
+## 2026-11-09 — Contract docs refreshed to the November contract (OB-69846)
+
+`looki_mcp/models.py` and the findings record now state the contract as
+verified on 2026-11-09 (RP-115): `GET /journals/by_date` recorded as retired
+(HTTP 400, code 105) rather than removed, `audio_summary` documented in the
+normalized `{text, topics, truncated}` shape OB-69845 landed, the moment-files
+pagination key renamed to `next_cursor`, the presigned host renamed to
+`user-file.looki.ai`, `search_context` characterised as a comma-separated
+keyword string, the `/moments/{id}` non-UUID 422 trap recorded, and the
+upstream agent skill document recorded as dead (404). A stale findings note
+that still called OB-69844 pending was corrected. PR #15, squash merge
+`d1b6f5ac09bb71876500ca1b513ef6443d78769c`. Docs-only, no deploy.
+
+Full story: `docs/narrative/2026-11-09-api-contract-parity-rp115.md`
+
+## 2026-11-09 — Probe harness re-baselined to the November contract (OB-69847)
+
+`scripts/api_contract_probe.py` now asserts the 2026-11-09 contract:
+`/journals/by_date` removed from the success paths and asserted retired
+(HTTP 400, code 105) alongside `/for_you/items`, `audio_summary` and
+`search_context` shape checks added on a recent-day sample, and the
+moment-files pagination expectation updated to `next_cursor`. The upstream
+skill document now 404s and previously hard-failed the probe before any live
+check ran, so a failed skill fetch now warns and lets the live contract
+decide. Validated both ways: exit 0 against the live API on the branch and
+on merged main (16 serial paced requests, all sections OK), and a
+deliberately flipped expectation exited 1 on both retired paths before
+being reverted. PR #18, squash merge
+`42ca23fbfce3a2d5588ca7d6a2f70d612b93fa40`. Script-only, no deploy. With
+this entry and the OB-69846 entry above, the RP-115 arc is now fully
+documented.
+
+Full story: `docs/narrative/2026-11-09-api-contract-parity-rp115.md`
 
 ## 2026-11-08 — Startup verification via /me (OB-69561)
 

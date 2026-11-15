@@ -36,6 +36,26 @@ sample; the moment-files pagination expectation is the renamed response
 key next_cursor (was next_cursor_id). The upstream skill doc URL returns
 404 as of 2026-11-09, so a failed skill fetch warns and the live contract
 checks decide the exit code.
+
+Re-baselined 2026-11-09 evening (OB-69900, official-parity pass): live
+checks added for the four endpoints the morning probe missed —
+/memory/overview, /summaries, /health-reports, /chat/history — asserting
+envelope code 0 and the verified key sets (field names only; record
+content is never printed); negative assertions added for the false
+routes /moments/dates and /journals/dates (HTTP 422 path-param captures
+on the detail routes, not endpoints) and the singular variants
+(/summary, /health, /chat, /memory -> 404); the /summaries param trap is
+asserted (missing type -> 422; date= instead of start_date/end_date ->
+HTTP 400 code 100).
+
+CANDIDATE-GENERATION RULE (learned 2026-11-09, OB-69900): future probe
+candidates come FIRST from the official CLI command table (@looki-ai/cli:
+memory overview, moment list/search/dates/view/files, journal
+list/dates/view, summary list, health list, chat history) plus the
+looki-personal-memory skill's record types, and only second from
+speculative path names. The morning 2026-11-09 probe hand-built its
+candidate list and missed all four endpoints above for lack of the exact
+names; do not repeat that.
 """
 from __future__ import annotations
 
@@ -346,6 +366,152 @@ def probe_live(base_url: str, api_key: str) -> tuple[list[str], int]:
                 print("  OK search_context values are comma-separated keyword strings or null")
         else:
             print("  WARN: no moments today or yesterday for audio_summary shape sample")
+
+        print("=== official-parity endpoints (2026-11-09 evening, OB-69900) ===")
+        # Field names only are asserted/printed; record content never is.
+        from datetime import date as _pdate, timedelta as _ptd
+
+        _win_end = _pdate.today().isoformat()
+        _win_start = (_pdate.today() - _ptd(days=2)).isoformat()
+
+        # /memory/overview: envelope code 0 + the verified key sets.
+        r = get(client, base + "/memory/overview")
+        body, code = _body_and_code(r)
+        data = body.get("data") if isinstance(body, dict) else None
+        summaries = data.get("summaries") if isinstance(data, dict) else None
+        _summary_keys = {
+            "identity", "lifestyle", "traits", "interests", "relationships",
+            "current_experiences", "looki_preferences",
+        }
+        if (
+            code == 0
+            and isinstance(summaries, dict)
+            and _summary_keys <= set(summaries)
+            and "updated_at" in data
+        ):
+            print("  OK /memory/overview code=0; summaries key set + updated_at present")
+        else:
+            failures.append(
+                f"/memory/overview contract changed: status={r.status_code} code={code}"
+            )
+            print("  FAIL /memory/overview contract changed")
+
+        # /summaries type=daily over a recent 3-day window.
+        r = get(
+            client,
+            base + "/summaries",
+            params={"start_date": _win_start, "end_date": _win_end, "type": "daily"},
+        )
+        body, code = _body_and_code(r)
+        data = body.get("data") if isinstance(body, dict) else None
+        items = data.get("items") if isinstance(data, dict) else None
+        if code == 0 and isinstance(items, list) and all(
+            isinstance(i, dict) and {"on_date", "summary"} <= set(i) for i in items
+        ):
+            print(f"  OK /summaries type=daily code=0; {len(items)} items, item keys verified")
+        else:
+            failures.append(
+                f"/summaries contract changed: status={r.status_code} code={code}"
+            )
+            print("  FAIL /summaries type=daily contract changed")
+
+        # Param traps: missing type -> 422; date= instead of
+        # start_date/end_date -> HTTP 400 code 100 (misleading detail).
+        r = get(
+            client,
+            base + "/summaries",
+            params={"start_date": _win_start, "end_date": _win_end},
+        )
+        if r.status_code == 422:
+            print("  OK /summaries without type rejected 422 (missing query.type)")
+        else:
+            failures.append(
+                f"/summaries without type should return 422, got status={r.status_code}"
+            )
+            print(f"  FAIL /summaries without type: status={r.status_code}")
+        r = get(client, base + "/summaries", params={"date": _win_end, "type": "daily"})
+        body, code = _body_and_code(r)
+        if r.status_code == 400 and code == CODE_INVALID_PARAMS:
+            print("  OK /summaries date= trap intact: HTTP 400 code=100")
+        else:
+            failures.append(
+                "/summaries date= trap changed: expected HTTP 400 "
+                f"code={CODE_INVALID_PARAMS}, got status={r.status_code} code={code}"
+            )
+            print("  FAIL /summaries date= trap changed")
+
+        # /health-reports over the same window.
+        r = get(
+            client,
+            base + "/health-reports",
+            params={"start_date": _win_start, "end_date": _win_end},
+        )
+        body, code = _body_and_code(r)
+        data = body.get("data") if isinstance(body, dict) else None
+        items = data.get("items") if isinstance(data, dict) else None
+        _report_keys = {
+            "summary", "calorie", "daily_metrics", "dietary_review",
+            "events", "time_range",
+        }
+        if code == 0 and isinstance(items, list) and all(
+            isinstance(i, dict)
+            and {"date", "tz", "report_data"} <= set(i)
+            and isinstance(i.get("report_data"), dict)
+            and _report_keys <= set(i["report_data"])
+            for i in items
+        ):
+            print(f"  OK /health-reports code=0; {len(items)} items, report_data keys verified")
+            if not items:
+                print("  WARN: no health reports in the sample window")
+        else:
+            failures.append(
+                f"/health-reports contract changed: status={r.status_code} code={code}"
+            )
+            print("  FAIL /health-reports contract changed")
+
+        # /chat/history first page: pagination fields + item keys.
+        r = get(client, base + "/chat/history", params={"limit": 2})
+        body, code = _body_and_code(r)
+        data = body.get("data") if isinstance(body, dict) else None
+        if (
+            code == 0
+            and isinstance(data, dict)
+            and {"items", "has_more", "next_cursor"} <= set(data)
+            and all(
+                isinstance(i, dict) and {"role", "text", "created_at"} <= set(i)
+                for i in data.get("items") or []
+            )
+        ):
+            print("  OK /chat/history code=0; items/has_more/next_cursor verified")
+        else:
+            failures.append(
+                f"/chat/history contract changed: status={r.status_code} code={code}"
+            )
+            print("  FAIL /chat/history contract changed")
+
+        print("=== false-route assertions (OB-69900) ===")
+        # /moments/dates and /journals/dates are NOT routes: the detail
+        # routes capture the segment as an id and reject it with 422.
+        for path in ("/moments/dates", "/journals/dates"):
+            r = get(client, base + path)
+            if r.status_code == 422:
+                print(f"  OK {path} is a path-param capture (422), not a route")
+            else:
+                failures.append(
+                    f"{path} should return 422 (path-param capture), "
+                    f"got status={r.status_code}"
+                )
+                print(f"  FAIL {path}: status={r.status_code}")
+        # Singular variants are plain 404s.
+        for path in ("/summary", "/health", "/chat", "/memory"):
+            r = get(client, base + path)
+            if r.status_code == 404:
+                print(f"  OK {path} 404 (not a route)")
+            else:
+                failures.append(
+                    f"{path} should return 404, got status={r.status_code}"
+                )
+                print(f"  FAIL {path}: status={r.status_code}")
 
     return failures, stats["requests"]
 

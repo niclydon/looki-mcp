@@ -35,6 +35,14 @@ log "checking installed requirements and the service import"
 "$SERVICE_DIR/.venv/bin/python" -c 'import main' \
   || die "main.py does not import in the service venv; $SERVICE_UNIT was not restarted"
 
+# OB-69925: gate the deploy on the offline test gate. A red suite means no
+# deploy, with the old process left serving.
+log "running offline test gate (scripts/run_offline_tests.sh)"
+[[ -x "$SERVICE_DIR/scripts/run_offline_tests.sh" ]] \
+  || die "scripts/run_offline_tests.sh is missing or not executable; $SERVICE_UNIT was not restarted"
+LOOKI_TEST_PYTHON="$SERVICE_DIR/.venv/bin/python" "$SERVICE_DIR/scripts/run_offline_tests.sh" \
+  || die "offline test gate failed; $SERVICE_UNIT was not restarted"
+
 # Persist the least-privilege mode required by the service owner. Files below
 # the directory keep their existing executable/readability modes.
 chmod 750 "$SERVICE_DIR"

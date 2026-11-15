@@ -124,8 +124,9 @@ and day caps.
 - URL host observed 2026-11-09: `user-file.looki.ai` (replacing the earlier
   `devo-user-file.looki.ai` host); path category encodes provenance:
   `/processed/{user_event_diary_image|dietary_image|storyboard_image|meeting_analysis_cover_image|daily_routine_image}/...`
-- `temporary_url` carries an `x-looki-token` JWT; observed expiry remains about
-  **1 hour**. Re-fetch via the entry if stale.
+- `temporary_url` carries an `x-looki-token` JWT; expiry re-verified live
+  2026-11-11: exp-iat = **600s (10 minutes)**, superseding the ~1 hour
+  observed on 2026-11-09. Re-fetch via the entry if stale.
 
 ## Mapping to MCP tools
 - `/journals/calendar` → `get_journals_calendar(start_date, end_date)` (mirror of `get_moments_calendar`)
