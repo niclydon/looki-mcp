@@ -19,11 +19,11 @@ def test_payload_keys_and_version():
     server.DEPLOYED_SHA_PATH = Path("/nonexistent/.deployed-sha")
     os.environ.pop("LOOKI_MCP_COMMIT", None)
     body = _get()
-    assert set(body) == {"status", "server", "version", "tools", "commit", "deployed_at"}
+    assert set(body) == {"status", "server", "version", "tools", "git_commit", "deployed_at"}
     assert body["status"] == "ok" and body["server"] == "looki-mcp"
     assert body["version"] == server.__version__
     assert body["tools"] >= 1
-    assert body["commit"] == "unknown" and body["deployed_at"] == "unknown"
+    assert body["git_commit"] == "unknown" and body["deployed_at"] == "unknown"
 
 
 def test_version_matches_pyproject():
@@ -38,7 +38,7 @@ def test_commit_from_deployed_sha():
         server.DEPLOYED_SHA_PATH = p
         os.environ.pop("LOOKI_MCP_COMMIT", None)
         body = _get()
-        assert body["commit"] == "abc1234"
+        assert body["git_commit"] == "abc1234"
         assert body["deployed_at"].endswith("Z") and body["deployed_at"] != "unknown"
 
 
@@ -46,7 +46,7 @@ def test_env_overrides_commit():
     server.DEPLOYED_SHA_PATH = Path("/nonexistent/.deployed-sha")
     os.environ["LOOKI_MCP_COMMIT"] = "envsha"
     try:
-        assert _get()["commit"] == "envsha"
+        assert _get()["git_commit"] == "envsha"
     finally:
         os.environ.pop("LOOKI_MCP_COMMIT", None)
 

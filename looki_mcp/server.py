@@ -144,7 +144,7 @@ async def health(request) -> JSONResponse:  # type: ignore[no-untyped-def]
             "server": "looki-mcp",
             "version": __version__,
             "tools": tool_count,
-            "commit": commit,
+            "git_commit": commit,
             "deployed_at": deployed_at,
         }
     )
