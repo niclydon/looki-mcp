@@ -35,3 +35,4 @@ tmp/
 .opencode/
 **/.claude/settings.local.json
 # END AI-CLI-WORKING-FOLDERS
+.deployed-sha.tmp

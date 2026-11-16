@@ -12,7 +12,7 @@ memories, moments, photos, AI-generated highlights, and written journal entries.
 ## What It Does
 
 Looki L1 is a wearable camera that passively captures your daily life. This MCP server
-exposes your Looki data through 30 tools that AI assistants can use to answer questions like:
+exposes your Looki data through 33 tools that AI assistants can use to answer questions like:
 
 - "What did I do last Thursday?"
 - "Find the moment where I was at the coffee shop"
@@ -42,10 +42,22 @@ git clone https://github.com/niclydon/looki-mcp.git
 cd looki-mcp
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.lock
 python main.py setup        # interactive credentials wizard
 python main.py              # start the server
 ```
+
+`requirements.txt` holds the human-readable dependency bounds (every direct
+dependency carries both a lower and an upper bound); `requirements.lock` is the
+pinned resolution the deploy installs from, regenerated from a clean
+Python 3.12 resolution with:
+
+```bash
+uv pip compile requirements.txt --python-version 3.12 -o requirements.lock
+```
+
+After changing a bound, regenerate the lock in the same commit so deploys keep
+carrying the verified resolution instead of floating on the day's pip resolve.
 
 The Looki logo (`assets/looki-logo.ico`) ships with the repo — nothing to fetch.
 
@@ -282,7 +294,7 @@ Expected startup output:
 ```
 looki-mcp: Verifying Looki base URL...
 looki-mcp: Base URL verified OK.
-[looki-mcp] Server running on http://0.0.0.0:3456/mcp (30 tools)
+[looki-mcp] Server running on http://0.0.0.0:3456/mcp (33 tools)
 ```
 
 The server validates your credentials before accepting connections — if anything is
@@ -350,9 +362,9 @@ sudo chown looki:looki /opt/looki-mcp
 git clone https://github.com/niclydon/looki-mcp /opt/looki-mcp
 cd /opt/looki-mcp
 
-# Set up venv + deps
+# Set up venv + deps (installs from the committed lock; see Installation)
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -r requirements.lock
 
 # Configure .env (copy from .env.example, fill in your credentials)
 cp .env.example .env
@@ -395,6 +407,9 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `get_chat_history` | Past conversations with the Looki assistant (cursor-paged) | `limit`, `since`, `cursor` |
 | `get_day_context` | One date assembled across record types (moments, daily summary, health report, journals), per-section failure isolation | `date` |
 | `get_personal_context` | Standing context: memory overview + latest daily + latest weekly summary | — |
+| `commitment_harvester` | To-do list mined from Actionable Suggestions / TODO lines in recent YESTERDAY_RECAP and audio-summary journals, by date | `days` |
+| `the_unwritten` | Significant moments on days with no event-level journal entry (the gaps in your story) | `days`, `min_significance` |
+| `places_of_my_life` | Places ranked by visits and time spent, from moment cover locations | `days`, `top_n` |
 | `get_moments_calendar` | Calendar view of active days | `start_date`, `end_date` |
 | `get_moments_by_date` | All moments on a specific date | `date` |
 | `get_moment_details` | Full details for one moment | `moment_id` |
@@ -435,7 +450,7 @@ the server works unchanged.
 
 ```
 GET /health
-{"status":"ok","server":"looki-mcp","version":"1.2.0","tools":30,"git_commit":"<sha or unknown>","deployed_at":"<UTC mtime of .deployed-sha or unknown>"}
+{"status":"ok","server":"looki-mcp","version":"1.2.0","tools":33,"git_commit":"<sha or unknown>","deployed_at":"<UTC mtime of .deployed-sha or unknown>"}
 ```
 
 Useful for Docker healthchecks, load balancers, and uptime monitoring.
@@ -464,7 +479,7 @@ error message when this limit is reached so the AI assistant can suggest waiting
 → Confirm `/logo.ico` is accessible: `curl https://your-server.example.com/logo.ico`
 
 **`fastmcp` not found / ImportError on startup**
-→ Activate your virtualenv: `source .venv/bin/activate` and re-run `pip install -r requirements.txt`.
+→ Activate your virtualenv: `source .venv/bin/activate` and re-run `pip install -r requirements.lock`.
 
 ## Project Layout
 
@@ -481,7 +496,8 @@ looki-mcp/
 │   ├── download_logo.py   # Maintenance script — re-fetch logo if Looki updates it
 │   └── smoke_test.py      # Import/registration test (no .env needed)
 ├── main.py                # Entry point
-├── requirements.txt
+├── requirements.txt       # Human-readable dependency bounds (lock source)
+├── requirements.lock      # Pinned resolution the deploy installs from
 ├── pyproject.toml
 ├── .env.example
 ├── Dockerfile

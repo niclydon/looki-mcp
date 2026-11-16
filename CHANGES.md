@@ -3,17 +3,78 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
-## 2026-11-13 — /health reports commit and deploy time (OB-69923)
+## 2026-11-16 — /health reports commit and deploy time (OB-69923)
 
 `/health` returned only `{status, server, version, tools}` and the version
-`1.1.0` was hardcoded in three places. The version now has one source
-(`pyproject.toml`, read via `importlib.metadata`, with a fallback constant for
-un-installed checkouts) and is bumped to 1.2.0 for the journals, composite and
-parity work merged since 1.1.0. `tools` is the live registered count. `/health`
-also returns `commit` (`LOOKI_MCP_COMMIT`, else `.deployed-sha` written by
+`1.1.0` was hardcoded in three places. The version now has one source:
+`pyproject.toml`, read at startup (installed package metadata is only a
+fallback when the file is absent; there is no version literal in code). It is
+bumped to 1.2.0 for the journals, composite, parity and Insight work merged
+since 1.1.0. `tools` is the live registered count (33). `/health` also returns
+`git_commit` (`LOOKI_MCP_COMMIT`, else `.deployed-sha` written by
 `scripts/deploy.sh`, else `unknown`) and `deployed_at` (UTC mtime of
-`.deployed-sha`, else `unknown`), matching looki-mcp-worker's
-`git_commit`/`deployed_at`. Covered by `scripts/test_health_endpoint.py`.
+`.deployed-sha`, reported only when the commit came from that file, else
+`unknown`), matching looki-mcp-worker. The stamp is read per request, so a
+redeploy shows without a restart, and `scripts/deploy.sh` now writes it
+atomically. The Dockerfile copies `pyproject.toml` so containers report the
+same version. Covered by `scripts/test_health_endpoint.py`.
+
+## 2026-11-15 — Insight tools live-verified; harvester fallback flagged (OB-69927)
+
+Closeout for RP-117. The three resurrected Insight tools are live at
+`4c62eca` (`/health` reports `tools=33`) and each was smoke-called
+against the operator's account on 2026-11-15: `places_of_my_life`
+(3 of 4 distinct places), `the_unwritten` (empty: every moment in a
+two-day window falls on a date with an event-level entry) and
+`commitment_harvester` (18 items from 2 entries). Every harvester item
+came through the unparsed fallback, so on current journal formats it
+returns whole entries rather than commitments; filed as a follow-up.
+The local-looki Muse skill still describes 24 tools and needs its own
+refresh. README and the tool table were already updated in #43.
+
+Full story: docs/narrative/2026-11-15-insight-tools-resurrection.md
+
+## 2026-11-12 — Dependency discipline: lockfile, upper bounds, checkout venv repaired (OB-69924)
+
+Deploys no longer float on the day's pip resolve. `requirements.txt` and
+`pyproject.toml` now carry upper bounds on every direct dependency —
+`fastmcp>=4.1.6,<5`, `httpx>=0.27.0,<1`, `python-dotenv>=1.0.0,<2`,
+`langfuse>=4.0.0,<5`, `boto3>=1.34.0,<2` — with the `langfuse` floor raised
+to the major production actually runs (4.x) and the `fastmcp` floor bumped
+past the 4.1.0 patch pile-up. `requirements.lock` pins the full resolution
+(`uv pip compile requirements.txt --python-version 3.12 -o requirements.lock`;
+fastmcp 4.1.8, currently the latest stable 4.1.x, langfuse 4.18.0), and
+`scripts/deploy.sh` installs from the lock when present, falling back to
+`requirements.txt` otherwise; the OB-65573 import-check gate is untouched.
+`scripts/test_deploy.sh` now covers the lock-install path. The repo checkout
+venv (`~/projects/looki-mcp/.venv`), which had drifted to fastmcp 3.2.4 /
+mcp 1.27.0 against the declared `fastmcp>=4.1.0,<5`, was rebuilt from the
+lock; tests run under the lock-resolved venv (offline suites:
+`scripts/test_*.py` excluding live `test_all_tools.py`). Regenerate the lock
+in the same commit as any bound change.
+
+## 2026-11-12 — Insight composite tools resurrected (OB-69926, RP-117)
+
+The three Insight composites built in RP-57 and archived unmerged
+(`archive/feat-insight-tools-pr2`, tip `f2f6b8e`) are ported file by file
+onto current main: `commitment_harvester`, `the_unwritten`,
+`places_of_my_life`, plus the `insight/journal_mine.py` extractor. They
+return the `{data, narrative, meta}` envelope; `narrative` is filled only
+when an LLM provider is configured and is null otherwise.
+
+Reconciled with what changed since July: `the_unwritten` reads journals
+from the paged `GET /journals` feed via `insight.scan.walk_journals`
+instead of the retired `GET /journals/by_date`; `places_of_my_life` uses
+main's `insight.geo` (JSON address strings collapse to a locality label)
+and drops the archived no-op `deep` flag; moment `audio_summary` goes
+through the shared `audio_summary` normalizer. No content is truncated:
+mined commitment text, moment descriptions, and audio summaries are
+returned in full. The harvester mines `YESTERDAY_RECAP`, `AUDIO_SUMMARY`
+and `MANUAL_AUDIO_SUMMARY` (text types per the 2026-11-09 contract);
+`the_unwritten` counts a day as written only for event-level entries
+(`DIARY`, audio summaries, `STORYBOARD`), not media-only types. The
+archived memory registrar is renamed `register_insight_memory_tools` to
+avoid colliding with `tools/memory.py`. Tool count 30 → 33.
 
 ## 2026-11-12 — Docker healthchecks follow LOOKI_PORT (OB-69929)
 

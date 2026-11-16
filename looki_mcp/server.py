@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 from datetime import datetime, timezone
+import tomllib
 from importlib.metadata import PackageNotFoundError, version as _dist_version
 from pathlib import Path
 
@@ -17,6 +18,9 @@ from looki_mcp.tools.composites import register_composite_tools
 from looki_mcp.tools.convenience import register_convenience_tools
 from looki_mcp.tools.highlights import register_highlights_tools
 from looki_mcp.tools.health import register_health_tools
+from looki_mcp.tools.insight_memory import register_insight_memory_tools
+from looki_mcp.tools.insight_places import register_places_tools
+from looki_mcp.tools.insight_productivity import register_productivity_tools
 from looki_mcp.tools.journals import register_journals_tools
 from looki_mcp.tools.memory import register_memory_tools
 from looki_mcp.tools.moments import register_moments_tools
@@ -27,16 +31,27 @@ from looki_mcp.tools.video import register_video_tools
 
 # Fallback tool count (asserted by scripts/smoke_test.py); /health reports the
 # live registered count and only falls back to this if listing fails.
-TOOL_COUNT = 30
+TOOL_COUNT = 33
 
-# Single source of truth for the version is pyproject.toml, read from the
-# installed distribution metadata. The constant is only a fallback for a bare
-# source checkout that was never pip-installed; keep it equal to pyproject.
-_FALLBACK_VERSION = "1.2.0"
-try:
-    __version__ = _dist_version("looki-mcp")
-except PackageNotFoundError:
-    __version__ = _FALLBACK_VERSION
+# Single source of truth for the version is pyproject.toml. The service runs
+# from a source checkout (scripts/deploy.sh) or a container that copies
+# pyproject.toml, and the package is never pip-installed there, so the file is
+# read first; installed distribution metadata is only a fallback for a wheel
+# install without the file, so a stale installed copy can never win. There is
+# no version literal in code.
+def _resolve_version() -> str:
+    try:
+        with open(Path(__file__).resolve().parent.parent / "pyproject.toml", "rb") as fh:
+            return str(tomllib.load(fh)["project"]["version"])
+    except (OSError, KeyError, tomllib.TOMLDecodeError):
+        pass
+    try:
+        return _dist_version("looki-mcp")
+    except PackageNotFoundError:
+        return "unknown"
+
+
+__version__ = _resolve_version()
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 LOGO_PATH = ASSETS_DIR / "looki-logo.ico"
@@ -88,6 +103,9 @@ mcp = FastMCP(
         "Journal images are AI-generated and their URLs expire quickly; capture_journal_media and "
         "backfill_journal_media save durable copies to object storage (get_journal_entry also captures on read). "
         "Use get_realtime_event or describe_realtime_event to check what the user is doing right now (requires Proactive Mode; describe adds optional Forge VLM snapshot caption when available)."
+        " Insight tools (commitment_harvester, the_unwritten, places_of_my_life) "
+        "combine multiple endpoints and return a {data, narrative, meta} envelope "
+        "(narrative is filled only when an LLM provider is configured)."
     ),
 )
 
@@ -103,6 +121,9 @@ register_journals_tools(mcp)
 register_realtime_tools(mcp)
 register_video_tools(mcp)
 register_convenience_tools(mcp)
+register_productivity_tools(mcp)
+register_insight_memory_tools(mcp)
+register_places_tools(mcp)
 
 
 SERVICE_ROOT = Path(__file__).parent.parent
@@ -113,22 +134,29 @@ def _deploy_stamp() -> tuple[str, str]:
     """Return (commit, deployed_at) for /health.
 
     scripts/deploy.sh writes the deployed SHA to .deployed-sha at the service
-    root; its mtime is the deploy time. LOOKI_MCP_COMMIT overrides the commit
-    (e.g. container builds). Mirrors looki-mcp-worker's git_commit/deployed_at,
-    with "unknown" when nothing is stamped.
+    root; its mtime is the deploy time. Read on every call, so a redeploy
+    shows without a restart. LOOKI_MCP_COMMIT overrides the commit (e.g.
+    container builds). Mirrors looki-mcp-worker's git_commit/deployed_at.
+
+    The pair always describes one deploy: deployed_at is the file's mtime only
+    when the commit came from that same file and is non-empty; an env-sourced
+    commit reports deployed_at "unknown", and an absent or empty stamp
+    reports both "unknown".
     """
-    commit = os.environ.get("LOOKI_MCP_COMMIT", "").strip()
-    deployed_at = "unknown"
+    env_commit = os.environ.get("LOOKI_MCP_COMMIT", "").strip()
+    if env_commit:
+        return env_commit, "unknown"
     try:
         st = DEPLOYED_SHA_PATH.stat()
-        deployed_at = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
-        if not commit:
-            commit = DEPLOYED_SHA_PATH.read_text().strip()
+        commit = DEPLOYED_SHA_PATH.read_text().strip()
     except OSError:
-        pass
-    return commit or "unknown", deployed_at
+        return "unknown", "unknown"
+    if not commit:
+        return "unknown", "unknown"
+    deployed_at = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+    return commit, deployed_at
 
 
 @mcp.custom_route("/health", methods=["GET"])
