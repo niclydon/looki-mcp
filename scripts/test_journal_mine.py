@@ -92,6 +92,31 @@ def test_long_item_not_truncated():
     out = extract_todo_section({"content": "### Suggestions for Today\n1. " + long.strip()})
     assert out["items"] == [long.strip()]
 
+def test_prose_starting_with_todo_is_not_a_commitment():
+    # AR 83d1384b F1: TODO needs a colon.
+    out = extract_todo_section({"content": "TODOs were discussed at length.\nTodo list app came up.\nTODO list review"})
+    assert out["items"] == [] and out["parsed_section"] is False, out
+
+def test_bullet_todo_line_is_a_commitment():
+    out = extract_todo_section({"content": "### Key Takeaways\n- A point\n- TODO: call Ana\n- todo:   book the room"})
+    assert out["items"] == ["call Ana", "book the room"], out
+    assert out["fallback_lines"] == ["A point"], out
+
+def test_plain_heading_inside_md_section_not_double_counted():
+    # AR 83d1384b F2: single pass; a plain heading the markdown section already read is not re-read.
+    out = extract_todo_section({"content": "### Action items\n- one\nNext steps\n- two\n### Views\n- v"})
+    assert out["items"] == ["one", "two"], out
+
+def test_two_distinct_sections_with_identical_items_both_count():
+    out = extract_todo_section({"content": "### Action items\n- Send it\n### Views\n- v\n### Follow-ups\n- Send it"})
+    assert out["items"] == ["Send it", "Send it"], out
+
+def test_bullet_named_like_a_heading_is_not_a_section():
+    # AR 83d1384b F3: "- Suggestions" is an item, never a heading.
+    out = extract_todo_section({"type": "AUDIO_SUMMARY", "content": "### Key Takeaways\n- Suggestions\n- Point one\n- Point two"})
+    assert out["parsed_section"] is False and out["items"] == [], out
+    assert out["fallback_lines"] == ["Suggestions", "Point one", "Point two"], out
+
 def main():
     test_heading_with_bullets()
     test_heading_variant_casing_and_punct()
@@ -105,6 +130,11 @@ def main():
     test_audio_without_follow_up_section_yields_no_items()
     test_md_section_stops_at_next_heading_and_skips_prose()
     test_long_item_not_truncated()
+    test_prose_starting_with_todo_is_not_a_commitment()
+    test_bullet_todo_line_is_a_commitment()
+    test_plain_heading_inside_md_section_not_double_counted()
+    test_two_distinct_sections_with_identical_items_both_count()
+    test_bullet_named_like_a_heading_is_not_a_section()
     print("\033[32mPASS\033[0m journal_mine")
 
 if __name__ == "__main__":

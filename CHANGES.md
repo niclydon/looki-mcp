@@ -11,9 +11,11 @@ items` / `### Follow-ups` in audio summaries, where a markdown section
 runs to the next heading even when its bullets are blank-line separated
 (the old rule stopped at the first blank and dropped later items). An
 entry with no follow-up section now contributes only explicit `TODO:`
-lines; its other bullets are narration, counted in
-`unsectioned_line_count` and listed by entry in `unparsed_entry_ids`,
-never returned as commitments. `commitment_count` and `total` are both
+lines (a `TODO` line needs a colon, bare or as a bullet); its other
+bullets are narration, counted in `unsectioned_line_count` (entries with no
+recognised section only) and listed by entry in `unparsed_entry_ids`, never
+returned as commitments. The scan is single-pass and never takes a list
+item for a heading, so no line is counted twice. `commitment_count` and `total` are both
 the number of items returned; the old `total` (every journal entry the
 feed returned) is now `entries_scanned`. Each item carries `source`
 (`section` or `todo_line`). Item text is still never truncated. The

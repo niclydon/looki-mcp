@@ -33,7 +33,12 @@ action section dumped their takeaways as if they were commitments.
 - A markdown (`#`) heading's section now runs to the next markdown
   heading, skipping blank and prose lines. A plain-text heading keeps the
   old blank-line rule, so older entries read the same.
-- Several recognised sections in one entry all count.
+- Several recognised sections in one entry all count, and the scan is
+  single-pass: each section resumes where the last one stopped, so no line
+  is read twice, and a list item such as `- Suggestions` is never taken
+  for a heading.
+- A `TODO` line needs a colon (bare or as a bullet), so prose that only
+  starts with "TODOs" or "Todo list" is not a commitment.
 - With no recognised section, explicit `TODO:` lines are still
   follow-ups. Every other bullet goes to `fallback_lines`, which the
   harvester counts (`unsectioned_line_count`, `unparsed_entry_ids`) but
@@ -51,3 +56,10 @@ Furnace (counts only), the new harvester returned 74 items, all from
 recognised sections: 42 recap suggestions, 30 audio action items and 2
 follow-ups. It left out 110 narration lines from 9 entries with no
 follow-up section, and its counters agreed.
+
+The first independent review found three ways narration could still leak
+or double-count: colon-less "TODO" prose, a plain heading re-read inside a
+markdown section, and a bullet that happened to read like a heading. Each
+now has a regression test that fails on the earlier parser. Re-run after
+those fixes, a day later in the window, the same check returned 76 items
+from 37 entries, all from sections, with 110 narration lines left out.
