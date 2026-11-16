@@ -450,7 +450,7 @@ the server works unchanged.
 
 ```
 GET /health
-{"status":"ok","server":"looki-mcp","version":"1.1.0","tools":33}
+{"status":"ok","server":"looki-mcp","version":"1.2.0","tools":33,"git_commit":"<sha or unknown>","deployed_at":"<UTC mtime of .deployed-sha or unknown>"}
 ```
 
 Useful for Docker healthchecks, load balancers, and uptime monitoring.

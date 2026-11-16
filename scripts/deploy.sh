@@ -69,5 +69,6 @@ health_json="$(curl --fail --silent --show-error --retry 12 --retry-delay 1 --re
 python3 -c 'import json,sys; body=json.load(sys.stdin); assert body.get("status") == "ok" and body.get("server") == "looki-mcp"' <<< "$health_json" \
   || die "health response did not identify a healthy looki-mcp server"
 
-printf '%s\n' "$SHA" > .deployed-sha
+# Atomic: /health reads this file per request, so never expose a truncated stamp.
+printf '%s\n' "$SHA" > .deployed-sha.tmp && mv -f .deployed-sha.tmp .deployed-sha
 log "deploy complete; health=ok sha=$SHA mode=$(stat -c '%a' "$SERVICE_DIR")"

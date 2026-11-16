@@ -3,6 +3,22 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-16 — /health reports commit and deploy time (OB-69923)
+
+`/health` returned only `{status, server, version, tools}` and the version
+`1.1.0` was hardcoded in three places. The version now has one source:
+`pyproject.toml`, read at startup (installed package metadata is only a
+fallback when the file is absent; there is no version literal in code). It is
+bumped to 1.2.0 for the journals, composite, parity and Insight work merged
+since 1.1.0. `tools` is the live registered count (33). `/health` also returns
+`git_commit` (`LOOKI_MCP_COMMIT`, else `.deployed-sha` written by
+`scripts/deploy.sh`, else `unknown`) and `deployed_at` (UTC mtime of
+`.deployed-sha`, reported only when the commit came from that file, else
+`unknown`), matching looki-mcp-worker. The stamp is read per request, so a
+redeploy shows without a restart, and `scripts/deploy.sh` now writes it
+atomically. The Dockerfile copies `pyproject.toml` so containers report the
+same version. Covered by `scripts/test_health_endpoint.py`.
+
 ## 2026-11-15 — Insight tools live-verified; harvester fallback flagged (OB-69927)
 
 Closeout for RP-117. The three resurrected Insight tools are live at

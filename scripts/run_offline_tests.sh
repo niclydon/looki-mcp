@@ -37,6 +37,7 @@ SUITES=(
   test_geo.py
   test_governed_get.py
   test_governor.py
+  test_health_endpoint.py
   test_health_reports.py
   test_highlights.py
   test_insight_llm.py

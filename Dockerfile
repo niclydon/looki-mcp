@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY looki_mcp ./looki_mcp
 COPY assets ./assets
 COPY main.py .
+COPY pyproject.toml .
 
 RUN chown -R looki:looki /app
 USER looki
