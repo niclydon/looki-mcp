@@ -3,6 +3,26 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-16 — commitment_harvester reads current journal headings (OB-70149)
+
+`commitment_harvester` now finds the follow-up sections Looki writes
+today: `### Suggestions for Today` in YESTERDAY_RECAP and `### Action
+items` / `### Follow-ups` in audio summaries, where a markdown section
+runs to the next heading even when its bullets are blank-line separated
+(the old rule stopped at the first blank and dropped later items). An
+entry with no follow-up section now contributes only explicit `TODO:`
+lines; its other bullets are narration, counted in
+`unsectioned_line_count` and listed by entry in `unparsed_entry_ids`,
+never returned as commitments. `commitment_count` and `total` are both
+the number of items returned; the old `total` (every journal entry the
+feed returned) is now `entries_scanned`. Each item carries `source`
+(`section` or `todo_line`). Item text is still never truncated. The
+four Insight suites (`test_commitment_harvester`, `test_journal_mine`,
+`test_places_of_my_life`, `test_the_unwritten`) were never in the offline
+gate; they are now, so a harvester regression blocks a deploy.
+
+Full story: docs/narrative/2026-11-16-commitment-harvester-current-headings.md
+
 ## 2026-11-16 — /health reports commit and deploy time (OB-69923)
 
 `/health` returned only `{status, server, version, tools}` and the version

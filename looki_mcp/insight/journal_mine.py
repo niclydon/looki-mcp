@@ -1,10 +1,24 @@
-"""Best-effort extraction from AI journal text.
+"""Best-effort extraction of follow-up items from AI journal text.
 
-The Looki journal section headings (e.g. YESTERDAY_RECAP's "Actionable
-Suggestions"/"TODOs") are OBSERVED, not contractual (see journals_api_findings.md),
-so extraction is tolerant: it matches a set of heading variants, and when none is
-found it falls back to scanning the whole body for list/TODO lines — never a silent
-empty. `parsed_section` tells the caller which path produced the result.
+The Looki journal section headings are OBSERVED, not contractual (see
+journals_api_findings.md). As of 2026-11-16 the shapes in use are:
+
+- YESTERDAY_RECAP: a markdown ``### Suggestions for Today`` section of numbered
+  items (older recaps used a plain ``Actionable Suggestions`` / ``TODOs`` line).
+- AUDIO_SUMMARY / MANUAL_AUDIO_SUMMARY: ``### Key Takeaways`` and ``### Views``
+  (narration), plus a ``### Action items`` section of dash bullets that is often
+  absent and whose bullets are separated by one or more blank lines.
+
+So extraction is tolerant: it matches a set of heading variants, and a markdown
+(``#``) heading's section runs to the next markdown heading, skipping blank and
+prose lines. A plain-text heading keeps the older rule: items until a blank line
+or prose after the first item.
+
+Only a recognised section, or an explicit ``TODO:`` line, yields ``items``. Other
+list lines in an entry with no recognised section are narration, not follow-ups,
+so they are returned separately as ``fallback_lines`` and never as items.
+``parsed_section`` says whether a recognised section produced the items. Item
+text is never truncated.
 """
 from __future__ import annotations
 
@@ -14,9 +28,11 @@ import re
 _TODO_HEADINGS = {
     "actionable suggestions", "actionable", "todos", "to-dos", "to do",
     "action items", "actions", "todo", "next steps",
+    "suggestions for today", "suggestions", "follow-ups", "follow ups",
 }
 _BULLET_RE = re.compile(r"^\s*(?:[-*•]|\d+[.)]|\[[ xX]?\])\s+(.*\S)\s*$")
 _TODO_PREFIX_RE = re.compile(r"^\s*TODO\s*:?\s*(.*\S)\s*$", re.IGNORECASE)
+_MD_HEADING_RE = re.compile(r"^\s*#{1,6}\s")
 
 
 def _clean_heading(line: str) -> str:
@@ -37,29 +53,62 @@ def _as_item(line: str) -> str | None:
     return None
 
 
+def _md_section_items(lines: list[str]) -> list[str]:
+    """Items under a markdown heading: every list line until the next markdown heading."""
+    items: list[str] = []
+    for follow in lines:
+        if _MD_HEADING_RE.match(follow):
+            break
+        item = _as_item(follow)
+        if item is not None:
+            items.append(item)
+    return items
+
+
+def _plain_section_items(lines: list[str]) -> list[str]:
+    """Items under a plain-text heading: until a blank line or prose after the first item."""
+    items: list[str] = []
+    for follow in lines:
+        if not follow.strip():
+            if items:
+                break
+            continue
+        item = _as_item(follow)
+        if item is not None:
+            items.append(item)
+        elif items:
+            break  # hit prose/next section after collecting items
+        # else: non-item line before any item: skip prose preamble under the heading
+    return items
+
+
 def extract_todo_section(entry: dict) -> dict:
     text = entry.get("content") or entry.get("description") or ""
     lines = text.splitlines()
 
-    # 1. Heading-anchored: find a TODO heading, collect following list items until a
-    #    blank line or the next heading-like (non-item, non-empty) line.
+    # 1. Heading-anchored. Several recognised sections in one entry all count.
+    items: list[str] = []
     for i, line in enumerate(lines):
         if _clean_heading(line) in _TODO_HEADINGS:
-            items: list[str] = []
-            for follow in lines[i + 1:]:
-                if not follow.strip():
-                    if items:
-                        break
-                    continue
-                item = _as_item(follow)
-                if item is not None:
-                    items.append(item)
-                elif items:
-                    break  # hit prose/next section after collecting items
-                # else: non-item line before any item—skip prose preamble under the heading
-            if items:
-                return {"items": items, "parsed_section": True, "candidate_lines": len(items)}
+            if _MD_HEADING_RE.match(line):
+                items.extend(_md_section_items(lines[i + 1:]))
+            else:
+                items.extend(_plain_section_items(lines[i + 1:]))
+    if items:
+        return {"items": items, "parsed_section": True, "candidate_lines": len(items),
+                "fallback_lines": []}
 
-    # 2. Fallback: scan the whole body for list/TODO lines.
-    items = [it for ln in lines if (it := _as_item(ln)) is not None]
-    return {"items": items, "parsed_section": False, "candidate_lines": len(items)}
+    # 2. No recognised section: explicit TODO: lines are still follow-ups; every
+    #    other list line is narration and goes to fallback_lines, never to items.
+    todo_items: list[str] = []
+    fallback: list[str] = []
+    for ln in lines:
+        m = _TODO_PREFIX_RE.match(ln)
+        if m:
+            todo_items.append(m.group(1).strip())
+            continue
+        m = _BULLET_RE.match(ln)
+        if m:
+            fallback.append(m.group(1).strip())
+    return {"items": todo_items, "parsed_section": False, "candidate_lines": len(todo_items),
+            "fallback_lines": fallback}

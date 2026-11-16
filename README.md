@@ -407,7 +407,7 @@ LOOKI_MCP_BASE_URL=https://looki-mcp.yourdomain.com
 | `get_chat_history` | Past conversations with the Looki assistant (cursor-paged) | `limit`, `since`, `cursor` |
 | `get_day_context` | One date assembled across record types (moments, daily summary, health report, journals), per-section failure isolation | `date` |
 | `get_personal_context` | Standing context: memory overview + latest daily + latest weekly summary | — |
-| `commitment_harvester` | To-do list mined from Actionable Suggestions / TODO lines in recent YESTERDAY_RECAP and audio-summary journals, by date | `days` |
+| `commitment_harvester` | To-do list mined from the follow-up sections of recent journals (recap "Suggestions for Today", audio "Action items" / "Follow-ups", older Actionable Suggestions / TODOs) plus explicit `TODO:` lines, by date; narration in entries with no such section is counted, never returned. `commitment_count` (= `total`) is the number of items returned | `days` |
 | `the_unwritten` | Significant moments on days with no event-level journal entry (the gaps in your story) | `days`, `min_significance` |
 | `places_of_my_life` | Places ranked by visits and time spent, from moment cover locations | `days`, `top_n` |
 | `get_moments_calendar` | Calendar view of active days | `start_date`, `end_date` |
