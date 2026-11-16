@@ -1,13 +1,25 @@
-"""Productivity insight tools. commitment_harvester mines TODO/Actionable sections
-out of YESTERDAY_RECAP and audio-summary journals — a to-do list built from your own
+"""Productivity insight tools. commitment_harvester mines the follow-up sections
+out of YESTERDAY_RECAP and audio-summary journals: a to-do list built from your own
 life. LLM-free core (the text is already in the journal body); an optional LLM
 narrative summarizes when a provider is configured.
 
 Journal types mined (contract verified 2026-11-09, journals_api_findings.md): the
-text types whose `content` is present and non-null and carries actionable prose —
-YESTERDAY_RECAP (sectioned, incl. Actionable Suggestions / TODOs), AUDIO_SUMMARY,
-and MANUAL_AUDIO_SUMMARY. DIARY vignettes (~100-180c event descriptions) are not
-mined. Item text is returned in full; Looki content is never truncated here.
+text types whose `content` is present and non-null and carries actionable prose:
+YESTERDAY_RECAP (``### Suggestions for Today``, older ``Actionable Suggestions`` /
+``TODOs``), AUDIO_SUMMARY and MANUAL_AUDIO_SUMMARY (``### Action items``). DIARY
+vignettes (~100-180c event descriptions) are not mined. An entry with no
+recognised section contributes only explicit ``TODO:`` lines; its other bullets
+are narration and are counted, not returned (OB-70149). Item text is returned in
+full; Looki content is never truncated here.
+
+Counters in ``data``:
+- ``commitment_count``: commitment items returned in ``by_date``.
+- ``total``: the same number, kept as the envelope's item count.
+- ``entries_scanned``: journal entries the feed returned, all types.
+- ``mined_entries``: distinct entries of a mined type.
+- ``unparsed_entries`` / ``unparsed_entry_ids``: mined entries with no recognised
+  follow-up section.
+- ``unsectioned_line_count``: list lines in those entries left out as narration.
 """
 from __future__ import annotations
 
@@ -27,7 +39,8 @@ _MINED_TYPES = {"YESTERDAY_RECAP", "AUDIO_SUMMARY", "MANUAL_AUDIO_SUMMARY"}
 
 def _harvest_commitments(entries: list[dict]) -> dict:
     by_date: dict[str, list[dict]] = {}
-    unparsed = 0
+    unparsed_ids: list = []
+    unsectioned_lines = 0
     mined = 0
     seen: set = set()
     for entry in entries:
@@ -42,8 +55,10 @@ def _harvest_commitments(entries: list[dict]) -> dict:
         mined += 1
         section = extract_todo_section(entry)
         if not section["parsed_section"]:
-            unparsed += 1
+            unparsed_ids.append(eid)
+            unsectioned_lines += len(section["fallback_lines"])
         date = entry.get("date") or entry.get("bucket_date") or "undated"
+        source = "section" if section["parsed_section"] else "todo_line"
         for text in section["items"]:
             by_date.setdefault(date, []).append({
                 "text": text,
@@ -51,13 +66,18 @@ def _harvest_commitments(entries: list[dict]) -> dict:
                 "entry_id": eid,
                 "title": entry.get("title"),
                 "parsed_section": section["parsed_section"],
+                "source": source,
             })
+    count = sum(len(v) for v in by_date.values())
     return {
         "by_date": by_date,
-        "commitment_count": sum(len(v) for v in by_date.values()),
-        "total": len(entries),
+        "commitment_count": count,
+        "total": count,
+        "entries_scanned": len(entries),
         "mined_entries": mined,
-        "unparsed_entries": unparsed,
+        "unparsed_entries": len(unparsed_ids),
+        "unparsed_entry_ids": unparsed_ids,
+        "unsectioned_line_count": unsectioned_lines,
     }
 
 
@@ -91,10 +111,13 @@ def register_productivity_tools(mcp: FastMCP) -> None:
     @mcp.tool
     async def commitment_harvester(days: int = 14) -> str:
         """
-        Builds a to-do list mined from your own life: extracts the Actionable
-        Suggestions / TODO lines out of your recent YESTERDAY_RECAP, AUDIO_SUMMARY and
-        MANUAL_AUDIO_SUMMARY journal entries, grouped by date, each item in full with
-        its source entry id. Works with no LLM configured (the text is already in the
+        Builds a to-do list mined from your own life: extracts the follow-up
+        sections (recap "Suggestions for Today", audio "Action items", older
+        Actionable Suggestions / TODOs) and explicit TODO: lines out of your recent
+        YESTERDAY_RECAP, AUDIO_SUMMARY and MANUAL_AUDIO_SUMMARY journal entries,
+        grouped by date, each item in full with its source entry id. Narration in
+        entries with no follow-up section is counted (unparsed_entries), never
+        returned as a commitment. Works with no LLM configured (the text is already in the
         journals). Use for "what did I say I'd do?" / "open commitments". Returns a
         {data, narrative, meta} envelope; narrative is null without an LLM provider.
 

@@ -22,16 +22,18 @@ def test_harvest_groups_by_date_and_flags():
         {"id": "e5", "type": "DAILY_VLOG", "date": "2026-06-19"},  # media type: no content key
     ]
     out = prod._harvest_commitments(entries)
-    assert out["total"] == 5, out
+    assert out["entries_scanned"] == 5, out
     assert out["mined_entries"] == 3, out  # DIARY + DAILY_VLOG ignored
     assert [c["text"] for c in out["by_date"]["2026-06-20"]] == ["Email Bob", "Pay rent"]
     assert out["by_date"]["2026-06-20"][0]["parsed_section"] is True
     texts_19 = [c["text"] for c in out["by_date"]["2026-06-19"]]
     assert texts_19 == ["follow up with Sarah", "Book flights"], texts_19
-    assert out["by_date"]["2026-06-19"][0]["parsed_section"] is False  # fallback path
+    assert out["by_date"]["2026-06-19"][0]["parsed_section"] is False  # TODO: line, no section
+    assert out["by_date"]["2026-06-19"][0]["source"] == "todo_line"
+    assert out["by_date"]["2026-06-20"][0]["source"] == "section"
     assert out["by_date"]["2026-06-19"][0]["title"] == "Standup"
-    assert out["commitment_count"] == 4
-    assert out["unparsed_entries"] == 1
+    assert out["commitment_count"] == 4 and out["total"] == 4
+    assert out["unparsed_entries"] == 1 and out["unparsed_entry_ids"] == ["e3"]
 
 def test_duplicate_entry_across_buckets_mined_once():
     e = {"id": "dup", "type": "YESTERDAY_RECAP", "date": "2026-06-20", "content": "TODOs\n- once"}
@@ -87,8 +89,34 @@ def test_bad_days_rejected():
     assert asyncio.run(prod._commitment_harvester_impl(days=0)).startswith("Error:")
     assert asyncio.run(prod._commitment_harvester_impl(days=91)).startswith("Error:")
 
+CURRENT_RECAP = ("### Morning\n- Walked to the market\n- Long chat by the water\n\n"
+                 "### Suggestions for Today\n1. Call the dentist\n2. Pack the camera bag")
+AUDIO_NO_ACTIONS = "### Key Takeaways\n- Point one\n- Point two\n\n### Views\n- A view"
+AUDIO_WITH_ACTIONS = "### Key Takeaways\n- Point\n\n### Action items\n\n- Send the deck\n\n\n- Book the room\n"
+
+def test_current_formats_return_only_follow_ups_with_agreeing_counters():
+    # OB-70149 live shape: one recap + one audio summary with no follow-up section
+    # used to return every bullet of both. Now only follow-ups come back.
+    entries = [
+        {"id": "r1", "type": "YESTERDAY_RECAP", "date": "2026-11-15", "content": CURRENT_RECAP},
+        {"id": "a1", "type": "AUDIO_SUMMARY", "date": "2026-11-15", "content": AUDIO_NO_ACTIONS},
+        {"id": "a2", "type": "AUDIO_SUMMARY", "date": "2026-11-14", "content": AUDIO_WITH_ACTIONS},
+        {"id": "d1", "type": "DIARY", "date": "2026-11-15", "content": "- a vignette"},
+    ]
+    out = prod._harvest_commitments(entries)
+    assert [c["text"] for c in out["by_date"]["2026-11-15"]] == ["Call the dentist", "Pack the camera bag"], out
+    assert [c["text"] for c in out["by_date"]["2026-11-14"]] == ["Send the deck", "Book the room"], out
+    assert all(c["parsed_section"] and c["source"] == "section"
+               for v in out["by_date"].values() for c in v), out
+    items = sum(len(v) for v in out["by_date"].values())
+    assert out["commitment_count"] == out["total"] == items == 4, out
+    assert out["entries_scanned"] == 4 and out["mined_entries"] == 3, out
+    assert out["unparsed_entries"] == 1 and out["unparsed_entry_ids"] == ["a1"], out
+    assert out["unsectioned_line_count"] == 3, out
+
 def main():
     test_harvest_groups_by_date_and_flags()
+    test_current_formats_return_only_follow_ups_with_agreeing_counters()
     test_duplicate_entry_across_buckets_mined_once()
     test_item_text_never_truncated()
     test_tool_wraps_in_envelope()

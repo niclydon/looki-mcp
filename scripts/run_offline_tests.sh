@@ -32,6 +32,7 @@ SUITES=(
   test_audio_summary.py
   test_cache.py
   test_chat_history.py
+  test_commitment_harvester.py
   test_composites.py
   test_envelope.py
   test_geo.py
@@ -41,16 +42,19 @@ SUITES=(
   test_health_reports.py
   test_highlights.py
   test_insight_llm.py
+  test_journal_mine.py
   test_journals_by_date.py
   test_journals_helpers.py
   test_journals_sort_order.py
   test_memory_overview.py
   test_moment_files_pagination.py
+  test_places_of_my_life.py
   test_realtime_describe.py
   test_scan.py
   test_storage_helpers.py
   test_storage_media_key.py
   test_summaries.py
+  test_the_unwritten.py
   test_video_duration.py
 )
 
