@@ -3,6 +3,40 @@
 Chronological per-phase log. Each entry points at the long-form story in
 `docs/narrative/`.
 
+## 2026-11-15 — Insight tools live-verified; harvester fallback flagged (OB-69927)
+
+Closeout for RP-117. The three resurrected Insight tools are live at
+`4c62eca` (`/health` reports `tools=33`) and each was smoke-called
+against the operator's account on 2026-11-15: `places_of_my_life`
+(3 of 4 distinct places), `the_unwritten` (empty: every moment in a
+two-day window falls on a date with an event-level entry) and
+`commitment_harvester` (18 items from 2 entries). Every harvester item
+came through the unparsed fallback, so on current journal formats it
+returns whole entries rather than commitments; filed as a follow-up.
+The local-looki Muse skill still describes 24 tools and needs its own
+refresh. README and the tool table were already updated in #43.
+
+Full story: docs/narrative/2026-11-15-insight-tools-resurrection.md
+
+## 2026-11-12 — Dependency discipline: lockfile, upper bounds, checkout venv repaired (OB-69924)
+
+Deploys no longer float on the day's pip resolve. `requirements.txt` and
+`pyproject.toml` now carry upper bounds on every direct dependency —
+`fastmcp>=4.1.6,<5`, `httpx>=0.27.0,<1`, `python-dotenv>=1.0.0,<2`,
+`langfuse>=4.0.0,<5`, `boto3>=1.34.0,<2` — with the `langfuse` floor raised
+to the major production actually runs (4.x) and the `fastmcp` floor bumped
+past the 4.1.0 patch pile-up. `requirements.lock` pins the full resolution
+(`uv pip compile requirements.txt --python-version 3.12 -o requirements.lock`;
+fastmcp 4.1.8, currently the latest stable 4.1.x, langfuse 4.18.0), and
+`scripts/deploy.sh` installs from the lock when present, falling back to
+`requirements.txt` otherwise; the OB-65573 import-check gate is untouched.
+`scripts/test_deploy.sh` now covers the lock-install path. The repo checkout
+venv (`~/projects/looki-mcp/.venv`), which had drifted to fastmcp 3.2.4 /
+mcp 1.27.0 against the declared `fastmcp>=4.1.0,<5`, was rebuilt from the
+lock; tests run under the lock-resolved venv (offline suites:
+`scripts/test_*.py` excluding live `test_all_tools.py`). Regenerate the lock
+in the same commit as any bound change.
+
 ## 2026-11-12 — Insight composite tools resurrected (OB-69926, RP-117)
 
 The three Insight composites built in RP-57 and archived unmerged
