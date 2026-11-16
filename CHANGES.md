@@ -248,6 +248,13 @@ repeats a non-advancing cursor instead of refetching the same page until the
 page cap. Tests cover advancing `cursor_date` pages, the stuck cursor, date
 normalization, and the tool-level by-date/today behavior offline.
 
+## 2026-11-09 — Keep bounded journal scans honest on a stuck date cursor (OB-69858)
+
+Arbitrary-date journal scans now report `scan_capped=true` when Looki repeats
+the same cursor, or returns no cursor while `has_more` is still true, before
+the requested date is reached. Such a stalled scan is no longer reported as an
+authoritative empty day. `normalize_date` is unchanged.
+
 ## 2026-11-09 — Send moment-file pagination cursor under the live API key (OB-69857)
 
 `get_moment_files` continues accepting its existing `cursor_id` input for

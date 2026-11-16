@@ -144,7 +144,7 @@ def main() -> int:
         return httpx.Response(200, json=_page(["2026-11-09", "2026-11-08"], cursor="2026-11-07", has_more=True))
 
     buckets, pages, capped = _run(stuck_cursor, "2026-11-06")
-    assert buckets == [] and pages == 2 and not capped
+    assert buckets == [] and pages == 2 and capped
 
     # normalize_date: unpadded month/day canonicalize; anything else is rejected.
     assert journals.normalize_date("2026-11-09") == "2026-11-09"
@@ -194,7 +194,13 @@ def main() -> int:
     assert out["date_local"] == "2026-11-09" and out["entry_count"] == 2
     assert [e["id"] for e in out["entries"]] == ["recap-1", "diary-1"]
 
-    print("PASS journals by-date scan + tools (present, multi-page, absent, bounded, stuck cursor, normalize, by-date, today)")
+    def missing_cursor(request):
+        return httpx.Response(200, json=_page(["2026-11-09", "2026-11-08"], cursor=None, has_more=True))
+
+    buckets, pages, capped = _run(missing_cursor, "2026-11-06")
+    assert buckets == [] and pages == 1 and capped
+
+    print("PASS journals by-date scan + tools (present, multi-page, absent, bounded, stalled/missing cursor, normalize, by-date, today)")
     return 0
 
 

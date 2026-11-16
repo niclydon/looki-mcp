@@ -295,17 +295,16 @@ async def _journals_for_date(client: Any, target_date: str) -> tuple[list[dict],
         if page_days and min(page_days) < target_date:
             exhausted = True
             break
-        if not has_more or not next_cursor:
+        if not has_more:
             exhausted = True
             break
-        if next_cursor == cursor:
-            # Upstream repeated its cursor: paging again would refetch the
-            # same page until the page cap. Treat the scan as exhausted.
-            exhausted = True
+        if not next_cursor or next_cursor == cursor:
+            # Upstream stalled before reaching the requested day. This is not
+            # an authoritative empty result; expose it as a capped scan.
             break
         cursor = next_cursor
 
-    capped = not matching and not exhausted and pages >= _DATE_SCAN_MAX_PAGES
+    capped = not matching and not exhausted
     return matching, pages, capped
 
 
