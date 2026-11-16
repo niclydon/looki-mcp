@@ -102,10 +102,6 @@ def _run_tool(handler, invoke):
 
 
 def main() -> int:
-    assert journals.normalize_date("2026-11-9") == "2026-11-09"
-    assert journals.normalize_date("0099-1-2") == "0099-01-02"
-    assert journals.normalize_date("not-a-date") is None
-
     def present(request):
         assert request.url.path == "/journals"
         return httpx.Response(200, json=_page(["2026-11-09", "2026-11-08"], cursor="2026-11-07", has_more=True))

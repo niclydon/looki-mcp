@@ -251,9 +251,9 @@ normalization, and the tool-level by-date/today behavior offline.
 ## 2026-11-09 — Keep bounded journal scans honest on a stuck date cursor (OB-69858)
 
 Arbitrary-date journal scans now report `scan_capped=true` when Looki repeats
-the same cursor before the requested date is reached. Date inputs accepted by
-`strptime` are normalized with `date().isoformat()` so leading-zero years keep
-the canonical `YYYY-MM-DD` shape used by date comparisons.
+the same cursor, or returns no cursor while `has_more` is still true, before
+the requested date is reached. Such a stalled scan is no longer reported as an
+authoritative empty day. `normalize_date` is unchanged.
 
 ## 2026-11-09 — Send moment-file pagination cursor under the live API key (OB-69857)
 
